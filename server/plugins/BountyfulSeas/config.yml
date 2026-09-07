@@ -1,0 +1,18 @@
+# BountyfulSeas
+
+water-map:
+  # Path to the water-analyzer executable from the minecraft-water-map-generator
+  # project. Leave empty and /bs watermapregenerate will tell you so rather than
+  # guessing where it lives.
+  analyzer: "C:/Users/marte/Desktop/Clean Repos/minecraft-water-map-generator/target/release/water-analyzer.exe"
+
+  # Rescan the world every time the server starts. Runs in the background once
+  # the server is up, so it never delays startup.
+  regenerate-on-start: true
+
+  # Extra flags passed to the analyzer. --world and --output are always supplied.
+  arguments:
+    - "--max-below-sea-level"
+    - "10"
+    - "--min-water-body"
+    - "20"

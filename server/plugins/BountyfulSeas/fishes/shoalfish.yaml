@@ -1,0 +1,25 @@
+# Shoalfish - small schooling fish of the open coast.
+
+herring:
+  lore:
+    - "Travels in silver walls that turn as one."
+    - "Fishermen say a shoal has a single mind."
+  fish_name: "<gray>Hering</gray>"
+  fish_item: "nexo:herring"
+
+  min_weight: 0.2
+  max_weight: 1.1
+
+  min_length: 15
+  max_length: 32
+
+  water_type: [ocean]
+  vegetation: [cold, temperate]
+  depth: [shallow]
+
+  spawn_weight: 140
+  rarity: common
+
+  on_eat:
+    saturation: 2
+    effects: []

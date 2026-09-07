@@ -1,0 +1,72 @@
+# Freshwater - rivers and lakes inland.
+
+river_trout:
+  lore:
+    - "Holds against the current without seeming to move."
+  fish_name: "<green>Bachforelle</green>"
+  fish_item: "nexo:river_trout"
+
+  min_weight: 0.4
+  max_weight: 2.5
+
+  min_length: 22
+  max_length: 55
+
+  water_type: [river, lake]
+  terrain: [plains]
+  vegetation: [cold, temperate]
+  depth: [shallow]
+  condition: [rain]
+
+  spawn_weight: 90
+  rarity: uncommon
+
+  on_eat:
+    saturation: 4
+    effects:
+      - type: regeneration
+        duration: 200
+        amplifier: 0
+
+lake_carp:
+  fish_name: "<yellow>Seekarpfen</yellow>"
+  fish_item: "nexo:lake_carp"
+  lore:
+    - "Grows old in still water, and grows heavy with it."
+
+  min_weight: 1.5
+  max_weight: 9.0
+
+  min_length: 30
+  max_length: 85
+
+  water_type: [lake]
+  depth: [shallow]
+
+  spawn_weight: 120
+  rarity: common
+
+  on_eat:
+    saturation: 5
+    effects: []
+
+river_dace:
+  fish_name: "<aqua>Hasel</aqua>"
+  fish_item: "nexo:river_dace"
+  lore:
+    - "Quick, plain, and everywhere the water runs."
+
+  min_weight: 0.1
+  max_weight: 0.8
+
+  min_length: 12
+  max_length: 28
+
+  water_type: [river]
+
+  spawn_weight: 130
+  rarity: common
+
+  on_eat:
+    saturation: 2
+    effects: []

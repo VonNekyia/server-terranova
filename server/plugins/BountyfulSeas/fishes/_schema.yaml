@@ -1,0 +1,39 @@
+# Field reference for every fish category in this folder.
+#
+# This file defines no fish - it is comments only, and the loader reads it as an
+# empty category. Name real files after the category they hold: tropicals.yaml,
+# predators.yaml, freshwater.yaml. Sub folders work too.
+#
+# fish_id:
+#   fish_name: ""              # required, MiniMessage
+#   fish_item: "nexo:item"     # required, namespaced
+#   lore:                      # optional flavour text, italic light grey
+#     - "A line of flavour text."
+#
+#   min_weight: 0              # defaults to 0, must not exceed max_weight
+#   max_weight: 0
+#
+#   min_length: 0              # defaults to 0, must not exceed max_length
+#   max_length: 0
+#
+#   water_type: [ocean, river, lake, cave]
+#   terrain:    [desert, swamp, plains]
+#   vegetation: [cold, temperate, warm]
+#   depth:      [shallow, deep]
+#   modifier:   [coral, ice]
+#   condition:  [rain, night, day]
+#
+#   bait_locked: false         # defaults to false
+#   spawn_weight: 100          # defaults to 100, 0 disables the fish
+#   rarity: common             # required
+#   # [common, uncommon, rare, epic, legendary, mythic, event, signature]
+#
+#   on_eat:                    # leave out entirely to make a fish inedible
+#     saturation: 0
+#     effects:
+#       - type: regeneration   # any effect the server knows
+#         duration: 200        # ticks, required
+#         amplifier: 0         # optional, 0 is the first tier
+#
+# Every trait list is a filter. Leaving one out, or leaving it empty, places no
+# restriction on that axis - a fish with no water_type can be caught anywhere.

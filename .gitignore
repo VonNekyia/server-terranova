@@ -1,34 +1,68 @@
-# MacOS DS_Store files
+# MacOS
 .DS_Store
 
-# Gradle cache folder
-.gradle
-
-# Gradle build folder
-build
-
 # IntelliJ
-out/
-.idea
+.idea/
 *.iml
-# mpeltonen/sbt-idea plugin
-.idea_modules/
+out/
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
+# Altes Arbeitsverzeichnis
+run/
 
-# Common working directory
-run
+# ---------------------------------------------------------------------------
+# server/ IST der Arbeitsordner und wird versioniert: Plugin-Jars, Plugin-
+# Configs, Serverconfig und start.bat gehoeren ins Repository.
+#
+# Ausgenommen ist alles, was zur Laufzeit entsteht oder heruntergeladen wird.
+# Faustregel: was start.bat, Paper oder ein Plugin selbst wiederherstellen
+# kann, wird nicht committet.
+# ---------------------------------------------------------------------------
 
-# The server folder is generated from server-26.2 by its start.bat and can be
-# deleted at any time - nothing in it is tracked.
-server/
+# Von start.bat heruntergeladen und angelegt
+server/mariadb/
 
-# Bundled plugin runtime output and history
-plugins-*/**/logs/
-plugins-*/**/.assetCache/
-plugins-*/**/.deobfCachedPacks/
-plugins-*/**/packsquash/
-plugins-*/**/libs/
-plugins-*/**/*.log
-plugins-*/**/*.log.lck
+# Von Paper heruntergeladen oder erzeugt
+server/cache/
+server/libraries/
+server/versions/
+server/logs/
+server/world/
+server/world_nether/
+server/world_the_end/
+server/usercache.json
+server/*.log
+server/.console_history
+server/.paper/
+
+# Abgeloest: MariaDB, Datenbankanlage und Sync laufen jetzt in start.bat
+server/plugins/Interconnect/
+server/plugins/Interconnect-*.jar
+
+# Heruntergeladene Abhaengigkeiten und Uebersetzungen der Plugins
+server/plugins/**/libs/
+server/plugins/**/lib/
+server/plugins/**/translations/
+
+# Laufzeitausgabe der Plugins
+server/plugins/**/logs/
+server/plugins/**/*.log
+server/plugins/**/*.log.lck
+server/plugins/**/.assetCache/
+server/plugins/**/.deobfCachedPacks/
+server/plugins/**/packsquash/
+server/plugins/**/.cache/
+server/plugins/**/.meta/
+server/plugins/bStats/
+server/plugins/spark/
+server/plugins/faststats/
+
+# Lokale Datenbanken (die echten Daten liegen in MariaDB)
+server/plugins/**/*.db
+server/plugins/**/*.sqlite
+server/plugins/**/*.mv.db
+
+# Generierte Ausgabe einzelner Plugins
+server/plugins/Nexo/pack/pack.zip
+server/plugins/Pl3xMap/web/tiles/
+server/plugins/FastAsyncWorldEdit/history/
+server/plugins/FastAsyncWorldEdit/clipboard/

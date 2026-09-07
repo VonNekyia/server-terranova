@@ -1,65 +1,73 @@
-# Interconnect
+# server-terranova
 
-Interconnect is a Paper test-server helper plugin. It prepares a local test environment for content and plugin work without asking every contributor to install and configure MariaDB or copy versioned plugin files by hand.
+Der Entwicklungsserver von Terranova. Das Repository **ist** der Server:
+Plugin-Jars, Plugin-Configs, Serverconfig und der Starter liegen unter
+`server/` und werden versioniert. Wer klont, hat einen lauffähigen Server.
 
-## What It Does
+## Starten
 
-- Starts a small embedded MariaDB server for the test server.
-- Uses a dedicated default database port, `13306`, so it does not conflict with a normal local MariaDB/MySQL install on `3306`.
-- Creates configured databases on startup.
-- Creates configured database accounts on startup. The default account is `minecraft` / `minecraft` with root privileges for local test use.
-- Provides `/db reset <plugin>` to drop and recreate a plugin database.
-- Provides a local Adminer-style editor at `http://127.0.0.1:8090/`.
-- Copies plugin jars and plugin config folders from the selected version folder, such as `plugins-26.2`, into the server `plugins` folder. Version folders can be shipped inside the Interconnect jar.
-
-## Default Database Setup
-
-The bundled `databases.yaml` is generated in `plugins/Interconnect/databases.yaml` on first startup.
-
-```yaml
-local-mariadb:
-  port: 13306
-
-accounts:
-  - username: minecraft
-    password: minecraft
-    root: true
+```
+server\start.bat
 ```
 
-Plugins that need SQL should point to:
+Doppelklick genügt. Beim ersten Start lädt das Skript einmalig MariaDB
+herunter (ca. 87 MB), richtet das Datenverzeichnis ein und legt die
+Datenbanken an. Danach startet Paper.
 
-- Host: `localhost`
-- Port: `13306`
-- Username: `minecraft`
-- Password: `minecraft`
+Voraussetzung ist eine installierte Java-Laufzeit. Getestet mit Java 25
+und Java 26.
 
-`Nations` is configured to use database `nations`.
+## Was start.bat übernimmt
 
-`Proficisci` is configured to use database `proficisci`.
+Die Datenbank läuft bewusst im Starter und nicht in einem Plugin. Paper
+liest `server.properties` und die Plugins ihre eigenen Configs, bevor ein
+Plugin überhaupt geladen werden könnte — nur so steht MariaDB schon beim
+allerersten Start bereit.
 
-## Plugin Version Folders
+1. MariaDB besorgen (einmalig) und das Datenverzeichnis initialisieren
+2. MariaDB auf Port `13306` starten
+3. Datenbanken und den Benutzer `minecraft` anlegen
+4. Paper starten
+5. MariaDB nach dem Beenden sauber herunterfahren
 
-Versioned plugin folders are selected in `databases.yaml`:
+Port `13306` statt `3306`, damit eine lokal installierte MySQL/MariaDB
+nicht kollidiert. Zugangsdaten für lokale Entwicklung: `minecraft` /
+`minecraft`. Datenbankzugriff mit einem externen Client wie HeidiSQL oder
+DBeaver auf `127.0.0.1:13306`.
 
-```yaml
-plugin-versions:
-  selected: "26.2"
-  folder-pattern: "plugins-%version%"
+## Eine Datenbank hinzufügen
+
+Eine Zeile in `server/start.bat`:
+
+```bat
+set "DATABASES=network nations betonquest chatcontrol interactivechat luckperms proficisci"
 ```
 
-With this configuration Interconnect looks for `plugins-26.2` next to the server first. If it is not present there, Interconnect falls back to the version folder bundled inside its own jar at `plugin-versions/plugins-26.2`. It copies all jar files and plugin config folders into the active server's `plugins` folder. If new jars were copied, restart the server so Paper can load them.
+Der Name muss zu dem passen, was das Plugin in seiner Config erwartet.
 
-## Commands
+## Mitarbeiten
 
-```text
-/db list
-/db adminer
-/db add <database>
-/db reset <plugin>
-```
+Änderungen an Plugin-Configs, Plugin-Jars und Serverconfig werden ganz
+normal committet — sie liegen alle unter `server/`.
 
-`/db reset <plugin>` supports configured plugin names and jar names from the selected plugin version folder.
+Nicht im Repository, weil zur Laufzeit erzeugt oder heruntergeladen:
 
-## License
+| Pfad | Warum |
+| --- | --- |
+| `server/world*/` | Weltdaten, ständig in Bewegung |
+| `server/mariadb/` | lädt `start.bat` selbst |
+| `server/libraries/`, `server/cache/`, `server/versions/` | lädt Paper selbst |
+| `server/logs/` | Laufzeitausgabe |
+| `server/plugins/**/libs/`, `**/translations/` | laden die Plugins selbst |
+| `server/plugins/**/*.db`, `*.mv.db` | lokale Dateidatenbanken; die echten Daten liegen in MariaDB |
 
-Interconnect is licensed under the MIT License. See [LICENSE](LICENSE).
+Faustregel: was `start.bat`, Paper oder ein Plugin selbst wiederherstellen
+kann, gehört nicht ins Repository.
+
+## Historie
+
+Das Repository hieß früher `Interconnect`, nach einem eigenen Plugin, das
+MariaDB startete und Plugins aus versionierten Ordnern in den Server
+kopierte. Beides erledigt jetzt `start.bat`, bevor die JVM läuft. Damit
+entfielen das 244 MB große Shaded-Jar samt Git-LFS, der Gradle-Build und
+der Zwang, den Server nach dem Einspielen neuer Jars zweimal zu starten.

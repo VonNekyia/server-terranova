@@ -1,14 +1,30 @@
 #
-# https://help.github.com/articles/dealing-with-line-endings/
+# Line ending normalization
+# https://docs.github.com/en/get-started/git-basics/configuring-git-to-handle-line-endings
 #
 
-# These are Windows script files and should use crlf
+# Normalize all detected text files and store them as LF
+*               text=auto eol=lf
+
+# Windows scripts should use CRLF
 *.bat           text eol=crlf
+*.cmd           text eol=crlf
 
 # Binary files should be left untouched
 *.jar           binary
 *.zip           binary
 *.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.webp          binary
 *.ico           binary
 *.ttf           binary
+*.otf           binary
+*.woff          binary
+*.woff2         binary
 *.bin           binary
+*.dat           binary
+*.db            binary
+*.sqlite        binary
+*.sqlite3       binary

@@ -20,8 +20,18 @@ set "MARIADB_PORT=13306"
 set "DB_USER=minecraft"
 set "DB_PASS=minecraft"
 
-rem Datenbanken, die angelegt werden. Neue hier eintragen.
-set "DATABASES=network nations betonquest chatcontrol interactivechat luckperms proficisci"
+rem Datenbanken, die angelegt werden. Wer ein Plugin mit eigener Datenbank
+rem ergaenzt, traegt den Namen hier ein - sonst startet es mit
+rem "Unknown database". Der Name muss zu dem passen, was das Plugin in
+rem seiner Config erwartet:
+rem   nations          Nations/config.yml -> name   (auch PlayerActionAdapter)
+rem   betonquest       BetonQuest/config.yml -> base
+rem   chatcontrol      ChatControl/database.yml -> Database
+rem   interactivechat  InteractiveChat/storage.yml -> Database
+rem   luckperms        LuckPerms/config.yml -> database
+rem   proficisci       Proficisci/config.yml -> database
+rem   bountyfulseas    BountyfulSeas/config.yml -> name
+set "DATABASES=network nations betonquest chatcontrol interactivechat luckperms proficisci bountyfulseas"
 
 set "PAPER_JAR=paper-26.2-121.jar"
 set "MYSQLD=%MARIADB_BASE%\bin\mysqld.exe"

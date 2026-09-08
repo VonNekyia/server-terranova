@@ -182,3 +182,16 @@ readbeard_journal:
   lore:
   - <!italic><dark_gray>Treasures
   - <italic><gray>Whatever was owed, the sea collected.
+unidentified_book:
+  material: PAPER
+  Pack:
+    parent_model: item/generated
+    custom_model_data: 9000
+    texture: bountyfulseas/unidentified_book.png
+  Mechanics:
+    misc:
+      allow_in_vanilla_recipes: false
+  itemname: <gold>unidentifiziertes Buch</gold>
+  lore:
+  - <!italic><dark_gray>Treasures
+  - <italic><gray>Something thats quite magical, but something is missing.

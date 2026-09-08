@@ -9,3 +9,15 @@ readbeard_journal:
 
   spawn_weight: 100
   rarity: treasure
+  
+unidentified_book:
+  fish_name: "<gold>unidentifiziertes Buch</gold>"
+  fish_item: "nexo:unidentified_book"
+  lore:
+    - "Something thats quite magical, but something is missing."
+
+  water_type: [ocean,lake,river]
+  depth: [deep,shallow]
+
+  spawn_weight: 100
+  rarity: treasure

@@ -10,9 +10,6 @@
 #   lore:                      # optional flavour text, italic light grey
 #     - "A line of flavour text."
 #
-#   min_weight: 0              # defaults to 0, must not exceed max_weight
-#   max_weight: 0
-#
 #   min_length: 0              # defaults to 0, must not exceed max_length
 #   max_length: 0
 #
@@ -20,13 +17,20 @@
 #   terrain:    [desert, swamp, plains]
 #   vegetation: [cold, temperate, warm]
 #   depth:      [shallow, deep]
-#   modifier:   [coral, ice]
-#   condition:  [rain, night, day]
+#   modifier:   [coral, ice, swarm]
+#               coral/ice are matched against the water at the spot.
+#               swarm means the fish moves: it gathers in a few regions at a
+#                 time and shifts on a timer, so it is only catchable where its
+#                 swarm currently is. Swarm regions are gold on the web map.
+#   condition:  [rain, storm, night, day]
 #
 #   bait_locked: false         # defaults to false
 #   spawn_weight: 100          # defaults to 100, 0 disables the fish
 #   rarity: common             # required
-#   # [common, uncommon, rare, epic, legendary, mythic, event, signature]
+#   # [common, rare, epic, misc, legendary, treasure, mythic, signature]
+#   # misc and treasure are not fish and carry no length.
+#   # Tier is rolled first, from rarity-chances in config.yml, then an entry
+#   # inside it by spawn_weight.
 #
 #   on_eat:                    # leave out entirely to make a fish inedible
 #     saturation: 0

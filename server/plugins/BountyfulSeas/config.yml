@@ -1,10 +1,10 @@
-# BountyfulSeas
+﻿# BountyfulSeas
 
 water-map:
   # Path to the water-analyzer executable from the minecraft-water-map-generator
   # project. Leave empty and /bs watermapregenerate will tell you so rather than
   # guessing where it lives.
-  analyzer: "C:/Users/marte/Desktop/Clean Repos/minecraft-water-map-generator/target/release/water-analyzer.exe"
+  analyzer: ""
 
   # Rescan the world every time the server starts. Runs in the background once
   # the server is up, so it never delays startup.
@@ -16,3 +16,61 @@ water-map:
     - "10"
     - "--min-water-body"
     - "20"
+
+database:
+  enabled: true
+  host: "127.0.0.1"
+  port: 13306
+  name: "bountyfulseas"
+  username: "minecraft"
+  password: "minecraft"
+  cache-seconds: 60
+
+# Swarming fish. A fish with the swarm modifier gathers in a few water regions at
+# a time and moves on, so it can only be caught where its swarm currently is.
+# Swarming regions are drawn gold on the web map.
+swarms:
+  # How many swarms exist at once, across every swarming fish. Each takes a
+  # region of its own, so more swarms than regions simply means fewer swarms.
+  count: 3
+
+  # How long a swarm stays put, in minutes.
+  rotate-minutes: 60
+
+# How likely each tier is when something bites. The tier is drawn first, then an
+# entry from within it by spawn_weight - so the odds of a legendary do not change
+# just because a spot happens to hold three of them.
+#
+# These are RELATIVE weights, not percentages. They are normalised against the
+# tiers actually available at a spot, so they need not add up to 100, and a tier
+# nobody has written a fish for costs nothing.
+#
+# misc is junk and treasure is loot; both are tiers rather than fish and carry no
+# length. signature is reserved for hand-placed fish and is never rolled by
+# default - give it a chance above 0 to put it in the draw.
+rarity-chances:
+  common: 75
+  rare: 15
+  trash: 5
+  epic: 2
+  misc: 2
+  legendary: 0.5
+  treasure: 0.5
+  mythic: 0.05
+  signature: 0
+
+# What a rod's enchantments are worth. Both add a percentage of the tier's BASE
+# chance per level, not percentage points, so Lure III at 10 makes a rare tier
+# 1.3 times as likely whatever the base numbers are set to.
+#
+# Chances are relative and normalised when rolled, so raising the rarer tiers
+# lowers common by itself. Nothing has to be subtracted by hand.
+enchantments:
+  lure:
+    # Every FISH tier above common: rare, epic, legendary, mythic. Lure is a
+    # fishing enchantment, so it does nothing for trash, misc or treasure.
+    bonus-per-level: 10
+  luck-of-the-sea:
+    # Treasure, and only treasure.
+    bonus-per-level: 10
+

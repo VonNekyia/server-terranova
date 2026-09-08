@@ -1,0 +1,7 @@
+{
+  "pack": {
+    "description": "BountyfulSeas - Luck of the Fish",
+    "pack_format": 61,
+    "supported_formats": { "min_inclusive": 48, "max_inclusive": 99 }
+  }
+}

@@ -144,3 +144,28 @@ coral_angel:
   lore:
   - <!italic><dark_gray>Tropicals
   - <italic><gray>Drifts through the reef like a scrap of stained glass.
+soggy_boot:
+  material: PAPER
+  Pack:
+    parent_model: item/generated
+    custom_model_data: 9000
+    texture: bountyfulseas/soggy_boot.png
+  Mechanics:
+    misc:
+      allow_in_vanilla_recipes: false
+  itemname: <dark_gray>Durchweichter Stiefel</dark_gray>
+  lore:
+  - <!italic><dark_gray>Junk
+sunken_pouch:
+  material: PAPER
+  Pack:
+    parent_model: item/generated
+    custom_model_data: 9001
+    texture: bountyfulseas/sunken_pouch.png
+  Mechanics:
+    misc:
+      allow_in_vanilla_recipes: false
+  itemname: <gold>Versunkener Beutel</gold>
+  lore:
+  - <!italic><dark_gray>Junk
+  - <italic><gray>Whatever was owed, the sea collected.

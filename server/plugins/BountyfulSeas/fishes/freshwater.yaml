@@ -1,4 +1,4 @@
-# Freshwater - rivers and lakes inland.
+﻿# Freshwater - rivers and lakes inland.
 
 river_trout:
   lore:
@@ -19,7 +19,7 @@ river_trout:
   condition: [rain]
 
   spawn_weight: 90
-  rarity: uncommon
+  rarity: rare
 
   on_eat:
     saturation: 4

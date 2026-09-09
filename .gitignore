@@ -65,6 +65,11 @@ server/plugins/**/*.sqlite
 server/plugins/**/*.mv.db
 
 # Generierte Ausgabe einzelner Plugins
+# Von BountyfulSeas aus den Fischdefinitionen erzeugt. Wird bei jedem Start
+# neu geschrieben und vergibt custom_model_data neu, was bei parallelem
+# Arbeiten Konflikte und doppelte IDs erzeugt hat. Die Quelle sind die
+# Dateien unter BountyfulSeas/fishes - neue Items dort eintragen.
+server/plugins/Nexo/items/bountyfulseas/fish.yml
 server/plugins/Nexo/pack/pack.zip
 server/plugins/Pl3xMap/web/tiles/
 server/plugins/FastAsyncWorldEdit/history/

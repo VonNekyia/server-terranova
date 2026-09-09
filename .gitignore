@@ -43,6 +43,9 @@ server/plugins/**/libs/
 server/plugins/**/lib/
 server/plugins/**/translations/
 
+# Von BountyfulSeas zur Laufzeit aus dem eigenen Jar ausgepackt
+server/plugins/BountyfulSeas/bin/
+
 # Laufzeitausgabe der Plugins
 server/plugins/**/logs/
 server/plugins/**/*.log

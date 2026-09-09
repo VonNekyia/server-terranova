@@ -41,36 +41,47 @@ swarms:
 # entry from within it by spawn_weight - so the odds of a legendary do not change
 # just because a spot happens to hold three of them.
 #
-# These are RELATIVE weights, not percentages. They are normalised against the
-# tiers actually available at a spot, so they need not add up to 100, and a tier
-# nobody has written a fish for costs nothing.
+# These are weights. The base set adds up to 100, and what an enchantment adds to
+# a better tier is taken back out of uncommon, so it stays adding up. Only the
+# tiers actually present at a spot take part in the draw.
 #
 # misc is junk and treasure is loot; both are tiers rather than fish and carry no
 # length. signature is reserved for hand-placed fish and is never rolled by
-# default - give it a chance above 0 to put it in the draw.
+# default - give it a weight above 0 to put it in the draw.
 rarity-chances:
-  common: 75
+  uncommon: 75      # the buffer: everything the enchantments add comes out of here
   rare: 15
-  trash: 5
-  epic: 2
-  misc: 2
+  misc: 5           # junk, and no enchantment lifts it
+  epic: 4
   legendary: 0.5
-  treasure: 0.5
-  mythic: 0.05
-  signature: 0
+  treasure: 0.5     # enchanted books and the like, lifted by Luck of the Sea
+  mythic: 0.05      # outside the hundred on purpose, and never lifted
+  signature: 0      # hand-placed only
 
-# What a rod's enchantments are worth. Both add a percentage of the tier's BASE
-# chance per level, not percentage points, so Lure III at 10 makes a rare tier
-# 1.3 times as likely whatever the base numbers are set to.
+# What a rod's enchantments are worth. Each adds a percentage of the tier's BASE
+# weight per level, and everything added is taken out of uncommon - so the total
+# stays where it started and the two enchantments never touch each other's tiers.
 #
-# Chances are relative and normalised when rolled, so raising the rarer tiers
-# lowers common by itself. Nothing has to be subtracted by hand.
+#   Luck of the Fish V:  rare 15 -> 22.5, epic 4 -> 6, legendary 0.5 -> 0.75
+#                        uncommon 75 -> 65.25, misc and treasure untouched
+#   Luck of the Sea V:   treasure 0.5 -> 0.75, uncommon 75 -> 74.75
+#
+# Both apply in full on a rod carrying both.
 enchantments:
-  lure:
-    # Every FISH tier above common: rare, epic, legendary, mythic. Lure is a
-    # fishing enchantment, so it does nothing for trash, misc or treasure.
+  luck-of-the-fish:
+    # The plugin's own enchantment, registered at startup and obtainable from an
+    # enchanting table like any other. Raises rare, epic and legendary only. Not
+    # misc, not treasure - and not mythic, so that no enchantment can make the
+    # rarest catch ordinary. Levels I to V, so +50% of base at full.
     bonus-per-level: 10
+
   luck-of-the-sea:
-    # Treasure, and only treasure.
+    # Treasure, and only treasure - that is where the enchanted books are.
     bonus-per-level: 10
+
+  lure:
+    # Off by default, so Lure keeps its vanilla job of making fish bite sooner.
+    # Set above 0 to have it raise the same tiers as Luck of the Fish; the two
+    # multiply rather than one replacing the other.
+    bonus-per-level: 0
 

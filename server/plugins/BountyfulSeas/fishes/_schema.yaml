@@ -26,8 +26,8 @@
 #
 #   bait_locked: false         # defaults to false
 #   spawn_weight: 100          # defaults to 100, 0 disables the fish
-#   rarity: common             # required
-#   # [common, rare, epic, misc, legendary, treasure, mythic, signature]
+#   rarity: uncommon           # required
+#   # [uncommon, rare, misc, epic, legendary, treasure, mythic, signature]
 #   # misc and treasure are not fish and carry no length.
 #   # Tier is rolled first, from rarity-chances in config.yml, then an entry
 #   # inside it by spawn_weight.

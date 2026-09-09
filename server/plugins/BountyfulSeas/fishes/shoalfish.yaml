@@ -7,8 +7,6 @@ herring:
   fish_name: "<gray>Hering</gray>"
   fish_item: "nexo:herring"
 
-  min_weight: 0.2
-  max_weight: 1.1
 
   min_length: 15
   max_length: 32
@@ -18,7 +16,7 @@ herring:
   depth: [shallow]
 
   spawn_weight: 140
-  rarity: common
+  rarity: uncommon
 
   on_eat:
     saturation: 2

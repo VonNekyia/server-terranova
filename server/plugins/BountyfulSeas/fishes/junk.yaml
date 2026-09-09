@@ -22,3 +22,11 @@ sunken_pouch:
 
   spawn_weight: 8
   rarity: treasure
+
+silver_corroded.png:
+  fish_name: "<dark_gray>korrodierte Silbermünze</dark_gray>"
+  fish_item: "nexo:silver_corroded.png"
+
+
+  spawn_weight: 2
+  rarity: misc

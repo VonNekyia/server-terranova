@@ -22,7 +22,8 @@
 param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [string[]]$Target,
-    [int]$Port = 0
+    [int]$Port = 0,
+    [string]$Motd
 )
 
 $ErrorActionPreference = 'Stop'
@@ -114,6 +115,7 @@ foreach ($dir in $Target) {
         'enable-rcon'               = 'true'
         'rcon.password'             = $rconPass
     }
+    if ($Motd) { $want['motd'] = $Motd }
     if ($srvPort -gt 0) {
         $want['server-port'] = "$srvPort"
         $want['query.port'] = "$srvPort"

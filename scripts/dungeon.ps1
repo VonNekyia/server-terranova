@@ -106,7 +106,8 @@ switch ($Action) {
 
             # Paper, Configs, Plugins, server.properties samt Port, RCON und
             # Forwarding-Secret - alles an einer Stelle.
-            & (Join-Path $PSScriptRoot 'sync-servers.ps1') -Root $Root -Target $dir -Port $port | Out-Null
+            & (Join-Path $PSScriptRoot 'sync-servers.ps1') -Root $Root -Target $dir `
+                -Port $port -Motd "Terranova Mine $n" | Out-Null
 
             $args = @("-Xms${Memory}M", "-Xmx${Memory}M") + $AikarFlags +
                     @('-jar', (Get-ChildItem (Join-Path $dir 'paper-*.jar') | Select-Object -First 1).Name, '--nogui')

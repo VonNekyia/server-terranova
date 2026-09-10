@@ -7,9 +7,8 @@ blind_cave_loach:
     - "Has no eyes worth the name, and no use for them."
     - "It knew the cave before the cave had a name."
 
-
-  min_length: 6
-  max_length: 24
+  max_length: 22
+  level: 8
 
   water_type: [cave]
 

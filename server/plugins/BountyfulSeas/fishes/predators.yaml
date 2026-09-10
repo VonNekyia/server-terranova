@@ -7,9 +7,8 @@ abyss_lantern:
   fish_name: "<gradient:#2b3f87:#7fd8ff>Abgrundlaterne</gradient>"
   fish_item: "nexo:abyss_lantern"
 
-
-  min_length: 40
-  max_length: 120
+  max_length: 122
+  level: 25
 
   water_type: [ocean, cave]
   depth: [deep]

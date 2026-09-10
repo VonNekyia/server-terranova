@@ -10,8 +10,13 @@
 #   lore:                      # optional flavour text, italic light grey
 #     - "A line of flavour text."
 #
-#   min_length: 0              # defaults to 0, must not exceed max_length
-#   max_length: 0
+#   max_length: 0              # the most this fish ever reaches, in cm
+#   # There is no minimum. Every length is rolled from this one number along the
+#   # curve in config.yml, and only one catch in a million comes up at it.
+#
+#   level: 1                   # defaults to 1: the angling level before it bites
+#   # A fish above the angler's level is not in the draw at all, so it never takes
+#   # a share of the odds it cannot pay out. Levels come from milestone XP.
 #
 #   water_type: [ocean, river, lake, cave]
 #   terrain:    [desert, swamp, plains]

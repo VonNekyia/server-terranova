@@ -1,8 +1,8 @@
 # server-terranova
 
-Das Terranova-Netzwerk. Das Repository **ist** das Netzwerk: Plugin-Jars,
-Plugin-Configs, Serverconfig, die CloudNet-Tasks und der Starter liegen hier
-und werden versioniert. Wer klont, hat ein lauffähiges Netzwerk.
+Das Terranova-Netzwerk. Das Repository **ist** das Netzwerk: Serverconfigs,
+Plugin-Configs, Plugin-Jars und die Skripte liegen hier und werden versioniert.
+Wer klont, hat ein lauffähiges Netzwerk.
 
 ## Starten
 
@@ -11,99 +11,106 @@ start.bat
 ```
 
 Doppelklick genügt. Beim ersten Start lädt das Skript einmalig MariaDB
-(ca. 87 MB) und Redis (ca. 4 MB) herunter, richtet die Datenverzeichnisse ein,
-legt die Datenbanken an und startet danach CloudNet. CloudNet fährt Proxy,
-main, build und farm selbst hoch.
+(ca. 87 MB) und Redis (ca. 4 MB) herunter, richtet die Datenverzeichnisse ein
+und legt die Datenbanken an. Danach bestückt es die Server aus `templates/`
+und startet Proxy, main, build und farm.
 
-Voraussetzung ist **Java 25**. CloudNet 4.0.0-RC17 besteht darauf und
-verweigert den Start unter Java 26. `start.bat` sucht sich selbst ein Java 25
-(Adoptium, Corretto, `%USERPROFILE%\.jdks`); mit `TERRANOVA_JAVA25=<JDK-Pfad>`
-lässt sich die Suche übergehen.
+Jeder Server bekommt sein eigenes Konsolenfenster — dort lässt sich wie gewohnt
+`stop`, `op …` oder `reload` eintippen. Das `start.bat`-Fenster bleibt als
+Aufsicht: es prüft alle 20 Sekunden, ob noch alle laufen, und startet neu, was
+abgestürzt ist. **Strg+C** fährt das ganze Netzwerk sauber herunter.
+
+Voraussetzung ist eine Java-Laufzeit. Getestet mit Java 25 und 26. Mit
+`TERRANOVA_JAVA=<Pfad zu java.exe>` lässt sich eine bestimmte erzwingen.
 
 ## Die Server
 
-| Server | Art | Speicher | Was drauf liegt |
+| Server | Port | Speicher | Was drauf liegt |
 | --- | --- | --- | --- |
-| `Proxy-1` | Velocity | 512 MB | der Eingang, Port 25565 |
-| `main-1` | Paper | 4 GB | die gewachsene Welt: Nations, BetonQuest, Nexo, Pl3xMap, BountyfulSeas, Citizens, Proficisci |
-| `build-1` | Paper | 2 GB | Bauserver |
-| `farm-1` | Paper | 2 GB | Farmserver |
-| `mining-N` | Paper | 2 GB | Dungeons, auf Zuruf erzeugt |
+| Proxy | **25565** | 512 MB | Velocity, der Eingang |
+| `main` | 25566 | 4 GB | die gewachsene Welt: Nations, BetonQuest, Nexo, Pl3xMap, BountyfulSeas, Citizens, Proficisci |
+| `build` | 25567 | 2 GB | Bauserver, Kreativ, flache Welt |
+| `farm` | 25568 | 2 GB | Farmserver |
+| `mining-1` … `mining-8` | 25571 … | 2 GB | Dungeons, auf Zuruf geöffnet |
 
-CloudNet hängt an jeden Dienstnamen eine Nummer. Es heißt also `main-1`, nicht
-`main` — auch dort, wo nur ein Dienst läuft.
+Nur der Proxy ist von außen erreichbar. Die Server binden auf `127.0.0.1` —
+wer direkt auf 25566 will, müsste schon auf der Maschine sein.
 
-### Dungeons öffnen
-
-In der CloudNet-Konsole:
+### Dungeons
 
 ```
-create by mining 3 --start
+powershell -File scripts\dungeon.ps1 open 3
+powershell -File scripts\dungeon.ps1 list
+powershell -File scripts\dungeon.ps1 close 2
 ```
 
-Das legt `mining-1`, `mining-2` und `mining-3` an und startet sie. Die Zahl ist
-frei; begrenzt wird nur durch den Arbeitsspeicher (siehe unten), nicht durch
-die Konfiguration.
+Ein Dungeon ist eine Kopie von `templates\mining` auf einem eigenen Port. Die
+acht Plätze stehen fest in `proxy\velocity.toml`; geöffnet wird nur, was
+gebraucht wird. Velocity stört ein eingetragener, nicht laufender Server nicht —
+ein Verbindungsversuch gibt dann nur eine Fehlermeldung.
 
-Ein Dungeon ist **24 Stunden offen**. Weil der `mining`-Task statisch ist,
-überlebt seine Welt einen Neustart innerhalb dieser Zeit. Abgeräumt wird er von
-`scripts\reap-mining.ps1`:
+Ein Dungeon bleibt **24 Stunden** offen und überlebt in dieser Zeit auch einen
+Neustart: `dungeon.ps1 open` kopiert nur, wenn das Verzeichnis noch fehlt.
+Abgeräumt wird er von
 
 ```
-powershell -File scripts\reap-mining.ps1 -WhatIf    # zeigt nur an
-powershell -File scripts\reap-mining.ps1            # löscht Abgelaufene
+powershell -File scripts\reap-mining.ps1 -WhatIf
+powershell -File scripts\reap-mining.ps1
 ```
 
-Gelöscht heißt: Verzeichnis weg. Das nächste `create by mining` legt es aus
-`network\local\templates\mining\default` neu an, also mit frischer Welt. Ein
-noch laufender Dungeon wird übersprungen — mit `-StopRunning` wird er vorher
-über die REST-Schnittstelle gestoppt.
+Gelöscht heißt: Verzeichnis weg, das nächste `open` legt eine frische Welt an.
+Ein noch laufender Dungeon wird übersprungen — `-StopRunning` beendet ihn
+vorher sauber.
 
 ## Aufbau
 
 ```
-start.bat                                MariaDB + Redis + CloudNet
+start.bat                   MariaDB, Redis, dann Proxy und Server
 scripts/
-  sync-forwarding-secret.ps1             Velocity-Secret erzeugen und verteilen
-  reap-mining.ps1                        abgelaufene Dungeons abräumen
-network/
-  launcher.jar  config.json              CloudNet
-  local/
-    tasks/*.json                         die fünf Tasks
-    templates/
-      Global/default/plugins/            Plugins, die jeder Server bekommt
-      Backend/default/                   gemeinsame Servereinstellungen
-      Proxy/default/                     Velocity
-      mining/default/                    Dungeon-Vorlage
-    services/
-      main-1/  build-1/  farm-1/         die festen Server, versioniert
-      mining-*/                          Dungeons, nicht versioniert
-runtime/                                 MariaDB und Redis, nicht versioniert
+  network.ps1               startet Proxy und Server, beaufsichtigt sie
+  sync-servers.ps1          Paper, Configs, Plugin-Jars und Secret in die Server
+  dungeon.ps1               Dungeons öffnen, schliessen, auflisten
+  reap-mining.ps1           abgelaufene Dungeons abräumen
+proxy/
+  velocity.toml             versioniert
+  velocity-*.jar            nicht versioniert
+  forwarding.secret         nicht versioniert
+servers/
+  main/  build/  farm/      versioniert: server.properties + Plugin-Configs
+  mining-*/                 nicht versioniert
+templates/
+  common/                   Paper, gemeinsame Configs, gemeinsame Plugin-Jars
+  main/plugins/             was nur main braucht
+  mining/                   die Dungeon-Vorlage
+runtime/                    MariaDB und Redis, nicht versioniert
 ```
 
 ### Wo ein Plugin hingehört
 
-**`network/local/templates/Global/default/plugins/`** — alles, was auf jedem
-Server laufen soll: TerranovaLib, LuckPerms, HuskSync, PlaceholderAPI samt
-Expansions, Vault, TAB, ChatControl, InteractiveChat, packetevents,
-FastAsyncWorldEdit, WorldGuard. Dieses Template wird bei **jedem** Start über
-die statischen Dienste kopiert (`alwaysCopyToStaticServices`), ein neues Jar
-wirkt also überall, ohne dass server-eigene Configs angefasst werden. Deshalb
-liegen hier ausschließlich Jars und keine Configs.
+Jedes Jar liegt **genau einmal** im Repository, nämlich unter `templates/`.
+`sync-servers.ps1` kopiert es bei jedem Start in die Server. Ein Plugin-Update
+ist damit eine Datei, kein viermaliges Kopieren.
 
-**`network/local/services/main-1/plugins/`** — was an mains Welt und seine
-Tabellen gebunden ist: Nations, Proficisci, PlayerActionAdapter, BountyfulSeas,
-Nexo, Citizens, Pl3xMap, BetonQuest. Pl3xMap (Port 8080) und Nexos Packserver
-(8082) binden feste Ports und können ohnehin nur einmal laufen.
+**`templates/common/plugins/`** — was auf jedem Server laufen soll:
+TerranovaLib, LuckPerms, HuskSync, PlaceholderAPI samt Expansions, Vault, TAB,
+ChatControl, InteractiveChat, packetevents, FastAsyncWorldEdit, WorldGuard.
 
-**`network/local/templates/mining/default/plugins/`** — bewusst dünn, damit ein
-Dungeon schnell startet. Hier landet BountyfulMining aus dem
-Schwesterrepository:
+**`templates/main/plugins/`** — was an mains Welt und seinen Tabellen hängt:
+Nations, Proficisci, PlayerActionAdapter, BountyfulSeas, Nexo, Citizens,
+Pl3xMap, BetonQuest. Pl3xMap (Port 8080) und Nexos Packserver (8082) binden
+feste Ports und können ohnehin nur einmal laufen.
+
+**`templates/mining/plugins/`** — bewusst dünn, damit ein Dungeon schnell
+startet. Hier landet BountyfulMining aus dem Schwesterrepository:
 
 ```
 cd ..\BountyfulMining
 gradle deployToTestServer
 ```
+
+Versioniert ist an einem Server nur, was ihm wirklich gehört: seine
+`server.properties` und die Configs seiner Plugins. Paper, die gemeinsamen
+Configs und alle Jars sind Kopien und stehen in `.gitignore`.
 
 ## Eine Datenbank hinzufügen
 
@@ -113,78 +120,67 @@ Eine Zeile in `start.bat`:
 set "DATABASES=nations betonquest chatcontrol interactivechat luckperms proficisci bountyfulseas husksync"
 ```
 
-Der Name muss zu dem passen, was das Plugin in seiner Config erwartet. Die
+Der Name muss zu dem passen, was das Plugin in seiner Config erwartet — die
 Zuordnung steht als Kommentar direkt darüber.
 
 Zugangsdaten für lokale Entwicklung: `minecraft` / `minecraft` auf
 `127.0.0.1:13306`. Redis läuft ohne Passwort auf `127.0.0.1:6379`.
 
-## Weiterleitung und das Forwarding-Secret
+## Weiterleitung
 
-CloudNet richtet die Weiterleitung **selbst** ein: es schreibt `server-ip`,
-`server-port` und `online-mode=false` in die `server.properties` jedes Backends
-und benutzt dabei standardmäßig *legacy forwarding* — den alten
-BungeeCord-Weg. Die von CloudNet erzeugte `velocity.toml` steht entsprechend
-auf `player-info-forwarding-mode = "legacy"`, und `paper-global.yml` wird bei
-jedem Start wieder auf `proxies.velocity.enabled: false` gesetzt.
+Velocity läuft mit **modern forwarding**: der Proxy prüft gegen Mojang und
+reicht UUID und Skin signiert weiter, das Backend prüft die Signatur gegen
+`proxy\forwarding.secret`. Die Server selbst laufen deshalb auf
+`online-mode=false`.
 
-`scripts\sync-forwarding-secret.ps1` pflegt deshalb nur die Secret-Datei unter
-`network\local	emplates\Proxy\defaultorwarding.secret`, die in
-`.gitignore` steht. In die Server-Configs schreibt es nichts — dagegen
-anzuschreiben würde beim nächsten Start ohnehin zurückgesetzt und hinterließe
-in der Zwischenzeit ein Geheimnis in einer versionierten Datei.
-
-Solange alle Dienste auf `127.0.0.1` gebunden sind, ist das vertretbar: die
-Backends glauben zwar jedem, der sie erreicht, aber erreichen kann sie nur, wer
-schon auf der Maschine ist. **Sobald ein Backend darüber hinaus erreichbar
-wird, gilt das nicht mehr** — dann auf modern forwarding umstellen:
-
-1. in `network/local/tasks/*.json` der Backends `"disableIpRewrite": true`
-   setzen, damit CloudNet `paper-global.yml` in Ruhe lässt
-2. in der `velocity.toml` des Proxy-Templates
-   `player-info-forwarding-mode = "modern"`
-3. in `paper-global.yml` jedes Backends `proxies.velocity.enabled: true` und
-   `secret` auf den Inhalt von `forwarding.secret`
-
-Das ist bewusst nicht vorkonfiguriert: es will einmal von Hand mit einem echten
-Verbindungsversuch geprüft werden.
+Das Secret erzeugt `sync-servers.ps1` beim ersten Start und trägt es in
+`config\paper-global.yml` jedes Servers ein. Beide sind in `.gitignore` — das
+Secret ist der einzige Schutz der Backends und gehört nicht ins Repository.
+Deshalb ist `servers/*/config/` als Ganzes nicht versioniert; die Vorlage dafür
+liegt in `templates/common/config/`.
 
 ## Speicher
 
-32 GB stehen zur Verfügung, CloudNet darf 24 GB davon vergeben
-(`maxMemory` in `network/config.json`) — der Rest bleibt für MariaDB, Redis und
-Windows. Proxy 0,5 + main 4 + build 2 + farm 2 macht 8,5 GB Grundlast, also
-rund **sieben Dungeons** gleichzeitig. `create by mining 20` würde die Maschine
-ins Swappen treiben; eine Obergrenze steht bewusst nicht in der Konfiguration
-(`maxServiceCount: -1`).
+Proxy 0,5 + main 4 + build 2 + farm 2 macht 8,5 GB Grundlast. Bei 32 GB im
+Rechner bleiben etwa 20 GB für Dungeons, also rund **acht** gleichzeitig — was
+genau den acht Plätzen in `velocity.toml` entspricht.
 
 ## Mitarbeiten
 
-Änderungen an Plugin-Configs, Plugin-Jars, Serverconfig und den Tasks werden
-ganz normal committet.
+Änderungen an Serverconfigs, Plugin-Configs und Plugin-Jars werden ganz normal
+committet.
 
 Nicht im Repository, weil zur Laufzeit erzeugt oder heruntergeladen:
 
 | Pfad | Warum |
 | --- | --- |
 | `runtime/` | MariaDB und Redis, lädt `start.bat` selbst |
-| `network/launcher/`, `network/modules/`, `network/temp/` | lädt CloudNet selbst |
-| `network/local/services/mining-*/` | Dungeons, nach 24 h ohnehin weg |
-| `network/.../forwarding.secret` | Geheimnis |
+| `servers/*/*.jar`, `servers/*/plugins/*.jar` | Kopien aus `templates/` |
+| `servers/*/config/`, `eula.txt`, `bukkit.yml`, `spigot.yml` | dito, plus das Forwarding-Secret |
+| `servers/mining-*/` | Dungeons, nach 24 h ohnehin weg |
+| `proxy/forwarding.secret`, `proxy/*.jar` | Geheimnis bzw. Kopie |
 | `**/world/`, `**/logs/`, `**/cache/`, `**/libraries/`, `**/versions/` | Laufzeitdaten |
 | `**/plugins/**/libs/`, `**/translations/` | laden die Plugins selbst |
 | `**/plugins/**/*.db`, `*.mv.db` | lokale Dateidatenbanken; die echten Daten liegen in MariaDB |
 
-Faustregel: was `start.bat`, CloudNet, Paper oder ein Plugin selbst
+Faustregel: was `start.bat`, `sync-servers.ps1`, Paper oder ein Plugin selbst
 wiederherstellen kann, gehört nicht ins Repository.
 
 ## Historie
 
-Bis September 2026 war das hier ein einzelner Paper-Server unter `server/`,
-gestartet von `server/start.bat`. Der Baum liegt jetzt unter
-`network/local/services/main-1/` und ist derselbe geblieben — die Umstellung
-war eine reine Umbenennung.
+Bis September 2026 war das hier ein einzelner Paper-Server unter `server/`.
+Daraus wurde ein Netzwerk aus Velocity plus vier Servern; mains Welt und
+Configs sind dabei unverändert mitgewandert.
+
+Zwischendurch stand CloudNet 4 als Orchestrierung dahinter. Es ist wieder
+herausgeflogen: seine Stärken sind Cluster über mehrere Maschinen und
+Autoscaling nach Spielerzahl, und beides braucht dieses Netzwerk nicht. Übrig
+blieben die Nachteile — es gibt keine stabile 4.x, der Launcher aktualisiert
+sich bei jedem Start aus dem *beta*-Zweig, er besteht auf genau Java 25, und er
+schreibt die Weiterleitung bei jedem Start auf *legacy* zurück. Einen Dungeon
+aus einer Vorlage zu kopieren und auf einem Port zu starten sind drei Zeilen
+PowerShell; dafür braucht es keinen Orchestrator.
 
 Davor hieß das Repository `Interconnect`, nach einem eigenen Plugin, das
 MariaDB startete und Plugins aus versionierten Ordnern in den Server kopierte.
-Beides erledigt jetzt `start.bat` bzw. CloudNet.
+Beides erledigen jetzt `start.bat` und `sync-servers.ps1`.

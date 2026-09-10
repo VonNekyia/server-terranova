@@ -1,0 +1,98 @@
+# Velocity 4 - der Eingang ins Terranova-Netzwerk.
+#
+# Alle Backends laufen auf derselben Maschine und binden auf 127.0.0.1. Nur
+# dieser Proxy ist von aussen erreichbar; wer direkt auf 25566 will, muesste
+# schon auf der Maschine sein.
+config-version = "2.9"
+# 0.0.0.0, damit Spieler aus dem Netz hereinkommen. Fuer einen reinen
+# Localhost-Test 127.0.0.1:25565 eintragen.
+bind = "0.0.0.0:25565"
+motd = "<#54c8ff>Terranova</#54c8ff>"
+show-max-players = 100
+# Der Proxy prueft gegen Mojang, die Backends nicht. Genau deshalb muessen die
+# Backends auf 127.0.0.1 gebunden bleiben.
+online-mode = true
+force-key-authentication = true
+prevent-client-proxy-connections = false
+# modern: Velocity reicht UUID und Skin signiert weiter, das Backend prueft die
+# Signatur gegen forwarding.secret. Der alte "legacy"-Weg vertraut jedem, der
+# das Backend erreicht - modern ist der Grund, warum wir online-mode=false auf
+# den Backends verantworten koennen.
+player-info-forwarding-mode = "modern"
+forwarding-secret-file = "forwarding.secret"
+# Announce whether or not your server supports Forge. If you run a modded server, we
+# suggest turning this on.
+#
+# If your network runs one modpack consistently, consider using ping-passthrough.modinfo = true
+# instead for a nicer display in the server list.
+announce-forge = false
+kick-existing-players = false
+enable-player-address-logging = true
+forced-hosts = {}
+
+[servers]
+	# Die drei festen Server.
+	main = "127.0.0.1:25566"
+	build = "127.0.0.1:25567"
+	farm = "127.0.0.1:25568"
+	# Dungeon-Plaetze. Sie stehen hier fest drin, obwohl meist keiner laeuft -
+	# Velocity stoert das nicht, ein nicht erreichbarer Server gibt beim Verbinden
+	# nur eine Fehlermeldung. Das erspart uns, Server zur Laufzeit anzumelden.
+	# Geoeffnet werden sie mit  scripts\dungeon.ps1 open <anzahl>
+	mining-1 = "127.0.0.1:25571"
+	mining-2 = "127.0.0.1:25572"
+	mining-3 = "127.0.0.1:25573"
+	mining-4 = "127.0.0.1:25574"
+	mining-5 = "127.0.0.1:25575"
+	mining-6 = "127.0.0.1:25576"
+	mining-7 = "127.0.0.1:25577"
+	mining-8 = "127.0.0.1:25578"
+	# Wer sich verbindet, landet auf main.
+	try = ["main"]
+
+[advanced]
+	compression-threshold = 256
+	compression-level = -1
+	login-ratelimit = 3000
+	connection-timeout = 5000
+	read-timeout = 30000
+	haproxy-protocol = false
+	tcp-fast-open = false
+	bungee-plugin-message-channel = true
+	show-ping-requests = false
+	failover-on-unexpected-server-disconnect = true
+	announce-proxy-commands = true
+	log-command-executions = false
+	log-player-connections = true
+	accepts-transfers = false
+
+[query]
+	enabled = false
+	port = 25565
+	map = "Velocity"
+	show-plugins = false
+
+[packet-limiter]
+	#Size of the moving time window in seconds used to calculate average rates.
+	#A larger window tolerates short bursts while still enforcing the configured limits over time.
+	interval = 7
+	#Maximum average number of packets per second a client may send. -1 disables this check.
+	packets-per-second = -1
+	#Maximum average number of compressed (on-wire) bytes per second a client may send. -1 disables this check.
+	bytes-per-second = -1
+	#Maximum average number of decompressed bytes per second a client may send.
+	#Protects against compression bomb attacks where small packets expand to excessive sizes after decompression.
+	#-1 disables this check.
+	decompressed-bytes-per-second = 5242880
+
+[ping-passthrough]
+	# Should Velocity pass the version number from the backend server when responding to server list ping requests?
+	version = false
+	# Should Velocity pass the player count from the backend server when responding to server list ping requests?
+	players = false
+	# Should Velocity pass the description from the backend server when responding to server list ping requests?
+	description = false
+	# Should Velocity pass the favicon (also known as the server icon) from the backend server when responding to server list ping requests?
+	favicon = false
+	# Should Velocity pass the mod list from the backend server when responding to server list ping requests?
+	modinfo = false

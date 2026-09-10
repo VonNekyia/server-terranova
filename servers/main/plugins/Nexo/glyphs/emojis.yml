@@ -1,0 +1,15 @@
+# Chat emojis
+#
+# Typing a placeholder in chat renders the texture instead.
+# `is_emoji: true` also lists the glyph in Nexo's emoji tab-completion.
+# A player needs the `permission` node to use the placeholder.
+
+heart:
+  texture: default/chat/heart
+  char: ♥
+  ascent: 8
+  height: 8
+  is_emoji: true
+  placeholders:
+    - <3
+  permission: oraxen.emoji.heart

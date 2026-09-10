@@ -7,60 +7,51 @@
 out/
 
 # ---------------------------------------------------------------------------
-# Die festen Server liegen unter network/local/services/<name>/ und werden
-# versioniert - Plugin-Jars, Plugin-Configs und Serverconfig gehoeren ins
-# Repository. Dasselbe gilt fuer die Templates unter network/local/templates/,
-# aus denen CloudNet die Dungeons erzeugt.
+# Die drei festen Server liegen unter servers/. Versioniert ist dort nur, was
+# einem Server wirklich gehoert: seine server.properties und die Configs
+# seiner Plugins.
 #
-# Ausgenommen ist alles, was zur Laufzeit entsteht oder heruntergeladen wird.
-# Faustregel: was start.bat, CloudNet, Paper oder ein Plugin selbst
+# Alles andere legt scripts/sync-servers.ps1 aus templates/ hinein - Paper,
+# die gemeinsamen Configs und die Plugin-Jars. Jedes Jar liegt damit genau
+# einmal im Repository, naemlich in templates/.
+#
+# Faustregel: was start.bat, sync-servers.ps1, Paper oder ein Plugin selbst
 # wiederherstellen kann, wird nicht committet.
 # ---------------------------------------------------------------------------
 
 # Von start.bat heruntergeladen und angelegt: MariaDB und Redis samt Daten
 runtime/
 
-# Von CloudNet selbst heruntergeladen oder erzeugt
-network/launcher/
-network/modules/
-network/temp/
-network/.wrapper/
-network/config.json
-network/launcher.cnl
-network/local/registry
-network/local/perms.json
-network/local/records/
-network/local/database/
-network/local/.consolehistory
+# Aus templates/ in die Server kopiert
+servers/*/*.jar
+servers/*/plugins/*.jar
+servers/*/plugins/PlaceholderAPI/expansions/
+servers/*/config/
+servers/*/server.properties
+servers/*/eula.txt
+servers/*/bukkit.yml
+servers/*/spigot.yml
 
-# Plugin-Jars in den Dienstverzeichnissen sind Kopien. Die Quelle ist immer ein
-# Template unter network/local/templates/ - CloudNet kopiert sie bei jedem Start
-# herunter. Versioniert werden in einem Dienst nur seine eigenen Configs.
-network/local/services/*/plugins/*.jar
-network/local/services/*/plugins/PlaceholderAPI/expansions/
+# Dungeons: entstehen aus templates/mining und werden nach 24 h verworfen
+servers/mining-*/
 
-# Laufzeitdaten des CloudNet-Wrappers in jedem Dienst
-network/local/services/*/.wrapper/
-
-# Dynamische Dungeons: entstehen aus dem Template und werden nach 24 h verworfen.
-# Nur das Template unter network/local/templates/mining/ ist die Quelle.
-network/local/services/mining-*/
-
-# Velocity-Forwarding-Secret: wird beim ersten Start erzeugt und gehoert
-# ausdruecklich nicht ins Repository
-**/forwarding.secret
+# Velocity: das Secret ist der einzige Schutz der Backends und gehoert nicht
+# ins Repository. Die Jars und Logs des Proxys ebensowenig.
+proxy/forwarding.secret
+proxy/*.jar
+proxy/logs/
+proxy/lang/
+proxy/plugins/*.jar
 
 # Von Paper heruntergeladen oder erzeugt
 **/cache/
 **/libraries/
 **/versions/
 **/logs/
-network/local/services/*/world/
-network/local/services/*/world_nether/
-network/local/services/*/world_the_end/
-network/local/templates/*/*/world/
-network/local/templates/*/*/world_nether/
-network/local/templates/*/*/world_the_end/
+servers/*/world/
+servers/*/world_nether/
+servers/*/world_the_end/
+templates/*/world/
 **/usercache.json
 **/.console_history
 **/.paper/

@@ -1,0 +1,98 @@
+# Multipack configuration
+#
+# Define optional resource pack templates and the GUI players see when running
+# `/nexo multipack` (or `/nexo multipack menu [player]`).
+#
+# Template packs live under `plugins/Nexo/pack/template_packs/<id>/` by default,
+# or you can set `path:` to a custom location.
+
+# ================================================================
+# Template definitions
+# ================================================================
+#templates:
+#  style_pastel:
+#    required: false          # If true, always applied — players cannot disable
+#    default: false           # Default enabled state for first-time players
+#    conflicts_with:          # Template ids that cannot be enabled simultaneously
+#      - style_retro
+#  style_retro:
+#    default: false
+#    conflicts_with:
+#      - style_pastel
+#  hd_textures:
+#    default: true
+
+# ================================================================
+# Menu layout
+# ================================================================
+# Coordinates are 1-indexed. `rows` must be 1..6.
+# Clicks only buffer a pending state; the pack is rebuilt/sent *once* on close,
+# and only if the player's selection actually changed.
+#
+# Per-slot keys:
+#   offset_x, offset_y              starting column / row
+#   size_x, size_y                  rectangular region size (item repeats across it)
+#   all_slots_except_first_empty    if true, the whole region is clickable but only
+#                                   the top-left cell renders the configured item;
+#                                   every other cell renders the `nexo:empty` model.
+#   item:                           fallback item, used when an action state has no
+#                                   item of its own (see below).
+#   action:                         TOGGLE or CYCLING — see examples below.
+#
+# An `item` block accepts ONE of:
+#   nexo_item: <nexo_item_id>               # reference a Nexo item
+#   minecraft_type: <MATERIAL>              # vanilla Material
+#   item_model: "namespace:path"            # set ITEM_MODEL on a base material
+#   item_model:                             # or an inline ItemModel definition
+#     model:                                # parsed via ItemModelBuilder
+#       type: minecraft:model
+#       model: "nexo:pack_icon"
+#   material: <MATERIAL>                    # optional base material when using
+#                                           # item_model (defaults to PAPER)
+#
+#menu:
+#  title: "<gold>Resource Packs"
+#  rows: 6
+#  slots:
+#
+#    # ---- TOGGLE example: different item per on/off state ----
+#    hd_toggle:
+#      offset: 2,2
+#      base_item:                                # base item which enabled/disabled are applied onto
+#        material: PAPER
+#      action:
+#        type: TOGGLE
+#        target: hd_textures
+#        enabled_item:
+#          material: DIAMOND
+#        disabled_item:
+#          material: COAL
+#
+#    # ---- CYCLING example: ordered targets, per-target item ----
+#    style_cycler:
+#      offset: 5,3
+#      size: 3,2
+#      all_slots_except_first_empty: true
+#      base_item:
+#        material: BOOKSHELF          # fallback when no style is active
+#      action:
+#        type: CYCLING
+#        targets:
+#          - id: style_pastel:
+#            material: PINK_WOOL
+#          - style_retro:
+#            material: GRAY_WOOL
+#          - id: style_classic              # no custom item → uses slot fallback
+#
+#    # ---- CYCLING shorthand: plain list, all targets share the slot fallback ----
+#    region_pack:
+#      offset: 1,1
+#      base_item:
+#        Components:
+#          item_model: "nexo:region_icon"
+#      action:
+#        type: CYCLING
+#        targets:
+#          - region_forest
+#          - region_desert
+#          - region_snow

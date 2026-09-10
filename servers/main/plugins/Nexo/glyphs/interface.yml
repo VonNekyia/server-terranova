@@ -1,0 +1,38 @@
+# Interface glyphs
+#
+# Nexo requires these entries: the language file and the built-in menus look
+# them up by name, so removing one makes the plugin fail to load.
+#
+# Never change a `char` that is already in use. It is baked into the generated
+# resource pack and into anything that stores the character (rank prefixes,
+# item names, signs).
+
+logo:
+  texture: required/logo
+  char: ꐙ
+  ascent: 20
+  height: 36
+
+menu_banner:
+  texture: required/ui/menu_banner
+  char: ꐚ
+  ascent: -10
+  height: 236
+
+menu_recipe:
+  texture: required/recipe_showcase
+  char: ꐛ
+  ascent: 40
+  height: 164
+
+menu_items_overlay:
+  texture: required/ui/menu_items_gems
+  char: ꐝ
+  ascent: 37
+  height: 256
+
+recipe_stonecutter:
+  texture: required/recipe_stonecutter
+  char: ꐞ
+  ascent: 40
+  height: 164

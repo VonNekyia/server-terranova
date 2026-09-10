@@ -1,0 +1,184 @@
+﻿# BountyfulSeas
+
+water-map:
+  # Path to the water-analyzer executable from the minecraft-water-map-generator
+  # project. Leave empty and /bs watermapregenerate will tell you so rather than
+  # guessing where it lives.
+  analyzer: ""
+
+  # Rescan the world every time the server starts. Runs in the background once
+  # the server is up, so it never delays startup.
+  regenerate-on-start: true
+
+  # Extra flags passed to the analyzer. --world and --output are always supplied.
+  arguments:
+    - "--max-below-sea-level"
+    - "10"
+    - "--min-water-body"
+    - "20"
+
+database:
+  enabled: true
+  host: "127.0.0.1"
+  port: 13306
+  name: "bountyfulseas"
+  username: "minecraft"
+  password: "minecraft"
+  cache-seconds: 60
+
+# Swarming fish. A fish with the swarm modifier gathers in a few water regions at
+# a time and moves on, so it can only be caught where its swarm currently is.
+# Swarming regions are drawn gold on the web map.
+swarms:
+  # How many swarms exist at once, across every swarming fish. Each takes a
+  # region of its own, so more swarms than regions simply means fewer swarms.
+  count: 3
+
+  # How long a swarm stays put, in minutes.
+  rotate-minutes: 60
+
+# How long a caught fish turns out to be.
+#
+# A fish definition gives one number, max_length - the most that fish ever
+# reaches. Everything below it is rolled from this curve, which is the shape
+# fisheries science uses for a real stock (Beverton and Holt): fish die off
+# steadily while their growth slows towards a ceiling, so most of what is
+# swimming is middling and only a few live long enough to get big.
+#
+#   P(longer than l) = ((max - l) / (max - smallest)) ^ shape
+#
+# With the defaults below, for a fish that reaches 100 cm:
+#
+#   half of all catches are under 41 cm
+#   4 in 100 are 75 cm or more
+#   3 in 1000 are 90 cm or more
+#   1 in 1000000 is the full 100 cm
+sizes:
+  # Z/K, the mortality-to-growth ratio: how many fish die for every bit of
+  # growing the survivors do. Real stocks sit around 1.5 to 3. Raise it and big
+  # ones get rarer; lower it and the catch evens out.
+  shape: 3
+
+  # The shortest a catch can be, as a fraction of that fish's maximum. This is
+  # what min_length used to be, except it is one rule for every fish: a hook does
+  # not bring up fry, which is the same reason the formula starts here.
+  smallest: 0.25
+
+  # One catch in this many comes up at exactly the maximum length. That is the
+  # record - the number in the fish file is not where the fish stop growing, it
+  # is the length hardly anyone ever sees.
+  record-odds: 1000000
+
+  # The marks along the curve worth naming, used by /bs debug lengthvalue to say
+  # what a length amounts to. A label and the fraction of catches that reach it;
+  # write as many or as few as you like, in any order.
+  brackets:
+    - label: "a record"
+      chance: 0.000001
+    - label: "1 in 100000"
+      chance: 0.00001
+    - label: "1 in 10000"
+      chance: 0.0001
+    - label: "1 in 1000"
+      chance: 0.001
+    - label: "top 1%"
+      chance: 0.01
+    - label: "top 10%"
+      chance: 0.10
+    - label: "above average"
+      chance: 0.50
+
+# The angling level.
+#
+# Every fish carries a level in its definition and does not bite until the angler
+# has reached it - it is not simply rarer, it is not in the draw at all. Levels
+# come from milestones: each one a fish passes is worth
+#
+#   experience = experience-per-step  x  which milestone it is (1 to 10)
+#                                     x  that fish's level
+#
+# so a fish's tenth milestone pays ten times its first, and a hard fish pays
+# better than an easy one. Nothing is stored: the experience is worked out from
+# the catch counts, so it can never drift away from them.
+#
+# Without a database there are no counts, so there is no level either - the gate
+# then stands open rather than locking every fish away forever.
+levels:
+  # Experience for the first milestone of a level one fish.
+  experience-per-step: 25
+
+  # What the second level costs. Reaching level n costs
+  # experience-base x (n - 1) ^ steepness in total, so with these numbers level 2
+  # costs 100, level 10 costs 5290 and level 50 costs 114800.
+  experience-base: 100
+  steepness: 1.8
+
+  max-level: 50
+
+# The two sides of the table.
+#
+# A fish tier holds things that were swimming and carry a length. An object tier
+# holds what the line brings up instead - junk, or a chest's worth of enchanted
+# books - and those carry no length at all: no max_length in the definition, no
+# measurement in chat, no record to beat.
+#
+# This split is also what the two luck enchantments are worked out from, so it is
+# worth getting right. On each side, the tier with the HIGHEST chance is the one
+# that pays for the enchantment rather than gaining from it, and the tier with the
+# LOWEST chance is the one that gains and never pays. Everything in between does
+# both. With the chances below that makes uncommon and misc the payers, and
+# legendary and treasure the two that survive any amount of enchanting.
+#
+# A tier at chance 0 is out of it entirely - neither lifted nor spent.
+tiers:
+  fish: [uncommon, rare, epic, legendary, mythic, signature]
+  objects: [misc, treasure]
+
+# How likely each tier is when something bites. The tier is drawn first, then an
+# entry from within it by spawn_weight - so the odds of a legendary do not change
+# just because a spot happens to hold three of them.
+#
+# These are weights. The base set adds up to 100, and what an enchantment adds to
+# a better tier is taken back out of uncommon, so it stays adding up. Only the
+# tiers actually present at a spot take part in the draw.
+#
+# misc is junk and treasure is loot; both are tiers rather than fish and carry no
+# length. signature is reserved for hand-placed fish and is never rolled by
+# default - give it a weight above 0 to put it in the draw.
+rarity-chances:
+  uncommon: 75      # the buffer: everything the enchantments add comes out of here
+  rare: 15
+  misc: 5           # junk, and no enchantment lifts it
+  epic: 4
+  legendary: 0.5
+  treasure: 0.5     # enchanted books and the like, lifted by Luck of the Sea
+  mythic: 0         # off for now; nothing lifts it and nothing spends it
+  signature: 0      # hand-placed only
+
+# What a rod's enchantments are worth. Each adds a percentage of the tier's BASE
+# weight per level, and everything added is taken out of uncommon - so the total
+# stays where it started and the two enchantments never touch each other's tiers.
+#
+#   Luck of the Fish V:  rare 15 -> 22.5, epic 4 -> 6, legendary 0.5 -> 0.75
+#                        uncommon 75 -> 65.25, misc and treasure untouched
+#   Luck of the Sea V:   treasure 0.5 -> 0.75, uncommon 75 -> 74.75
+#
+# Both apply in full on a rod carrying both.
+enchantments:
+  luck-of-the-fish:
+    # The plugin's own enchantment, registered at startup and obtainable from an
+    # enchanting table like any other. Raises rare, epic and legendary only. Not
+    # misc, not treasure - and not mythic, so that no enchantment can make the
+    # rarest catch ordinary. Levels I to V, so +50% of base at full.
+    bonus-per-level: 10
+
+  luck-of-the-sea:
+    # Treasure, and only treasure - that is where the enchanted books are.
+    bonus-per-level: 10
+
+  lure:
+    # Off by default, so Lure keeps its vanilla job of making fish bite sooner.
+    # Set above 0 to have it raise the same tiers as Luck of the Fish; the two
+    # multiply rather than one replacing the other.
+    bonus-per-level: 0
+

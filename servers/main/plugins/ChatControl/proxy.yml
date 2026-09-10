@@ -1,0 +1,25 @@
+# -----------------------------------------------------------------------------------------------------
+# A file that hold proxy-related related settings. Kept separate from settings.yml so you can symlink
+# the main settings or publish it to a Git while keeping the server name configured separately. 
+#
+# Changes to this file require a full server restart.
+# -----------------------------------------------------------------------------------------------------
+
+# Support proxy? (BungeeCord/Waterfall, Velocity, etc.)
+# See https://docs.mineacademy.org/chatcontrol/proxy for installation guide.
+Enabled: false
+
+# The prefix before the message sent to proxy. Set to empty to disable.
+Prefix: "<dark_gray>[<yellow>{server_name}<dark_gray>] <gray>"
+
+# Set a unique name of this server. Only alphanumeric and underscores are allowed.
+#
+# **WARNING** If using proxy, this must match the server name you have in velocity.toml or 
+#             BungeeControl's config.yml, NOT your server alias in BungeeControl or VelocityControl.
+Server_Name: 'terranova'
+
+# Allow the /chc forward command to be executed from console?
+# 
+# NB: This only works when at least one player is online on the server,
+# as Bukkit requires a player connection to send plugin messages to the proxy.
+Allow_Console_Forward_Command: false

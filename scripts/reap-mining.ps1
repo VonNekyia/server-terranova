@@ -2,19 +2,16 @@
 # Raeumt abgelaufene Dungeons ab.
 #
 # Ein Dungeon ist 24 Stunden offen. Die Uhr laeuft ab dem Anlegen des
-# Dienstverzeichnisses unter network\local\services\mining-*. Weil der mining-
-# Task statisch ist, ueberlebt ein Dungeon Neustarts innerhalb dieser Zeit -
-# abgeraeumt wird er nur hier.
+# Verzeichnisses unter servers\mining-*. Ein Neustart in dieser Zeit behaelt
+# die Welt - dungeon.ps1 kopiert nur, wenn das Verzeichnis noch fehlt.
 #
-# Loeschen heisst: Verzeichnis weg. Beim naechsten "create by mining" legt
-# CloudNet es aus network\local\templates\mining\default neu an, also mit
-# frischer Welt.
+# Loeschen heisst: Verzeichnis weg. Das naechste "dungeon.ps1 open" legt es
+# aus templates\mining neu an, also mit frischer Welt.
 #
 # Ein laufender Dungeon wird nicht angefasst. Der Prozess haelt Dateien offen,
-# und ein halb geloeschtes Dienstverzeichnis ist schlimmer als eines, das eine
-# Viertelstunde zu lang steht - beim naechsten Lauf ist er gestoppt und dann
-# faellt er weg. Mit -StopRunning wird er vorher ueber die REST-Schnittstelle
-# gestoppt (setzt "modules install CloudNet-Rest" voraus).
+# und ein halb geloeschtes Verzeichnis ist schlimmer als eines, das eine
+# Viertelstunde zu lang steht - beim naechsten Lauf ist er gestoppt und faellt
+# dann weg. Mit -StopRunning wird er vorher sauber beendet.
 #
 # Aufruf (Testlauf, aendert nichts):
 #   powershell -File scripts\reap-mining.ps1 -WhatIf
@@ -23,15 +20,14 @@
 param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [int]$MaxAgeHours = 24,
-    [switch]$StopRunning,
-    [string]$RestUrl = 'http://127.0.0.1:2812'
+    [switch]$StopRunning
 )
 
 $ErrorActionPreference = 'Stop'
 
-$servicesDir = Join-Path $Root 'network\local\services'
+$servicesDir = Join-Path $Root 'servers'
 if (-not (Test-Path $servicesDir)) {
-    Write-Output "[reap] kein services-Verzeichnis unter $servicesDir"
+    Write-Output "[reap] kein servers-Verzeichnis unter $servicesDir"
     return
 }
 
@@ -52,21 +48,17 @@ foreach ($d in $dungeons) {
         continue
     }
 
-    # Laeuft der Dungeon noch? Ein Java-Prozess, dessen Arbeitsverzeichnis oder
-    # Kommandozeile auf dieses Verzeichnis zeigt, haelt die Weltdateien offen.
-    $running = Get-CimInstance Win32_Process -Filter "Name='java.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -and $_.CommandLine -like "*$($d.Name)*" }
+    # Laeuft der Dungeon noch? Er haelt dann die Weltdateien offen. Erkannt wird
+    # er am Port 25570+n - die Kommandozeile taugt nicht dafuer, weil der Pfad
+    # nur im Arbeitsverzeichnis steht.
+    $n = [int]($d.Name -replace '^mining-', '')
+    $running = Get-NetTCPConnection -LocalPort (25570 + $n) -State Listen -ErrorAction SilentlyContinue
 
     if ($running) {
         if ($StopRunning) {
-            Write-Output ("[reap] {0}: {1} h alt, wird ueber REST gestoppt" -f $d.Name, $ageHours)
-            try {
-                Invoke-RestMethod -Method Delete -Uri "$RestUrl/api/v3/service/$($d.Name)" -TimeoutSec 20 | Out-Null
-                Start-Sleep -Seconds 15
-            } catch {
-                Write-Warning ("[reap] {0}: REST-Stopp fehlgeschlagen ({1}). Uebersprungen." -f $d.Name, $_.Exception.Message)
-                continue
-            }
+            Write-Output ("[reap] {0}: {1} h alt, wird beendet" -f $d.Name, $ageHours)
+            & (Join-Path $PSScriptRoot 'dungeon.ps1') close -Slot $n -Root $Root | Out-Null
+            Start-Sleep -Seconds 5
         } else {
             Write-Output ("[reap] {0}: {1} h alt, laeuft aber noch - uebersprungen. Mit -StopRunning erzwingen." -f $d.Name, $ageHours)
             continue

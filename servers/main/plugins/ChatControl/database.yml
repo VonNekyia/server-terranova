@@ -1,0 +1,39 @@
+# -----------------------------------------------------------------------------------------------------
+# This file holds database-related information. 
+#
+# **IMPORTANT** The utf8mb4_unicode_520_ci collation (database encoding) is required, because we need
+# need to store messages in 4 bytes (mb4) due to unicode/emojis/non-English letter support.
+#
+# Using MySQL 8.0 is recommended. ChatControl wil attempt to recreate tables with the right
+# encoding if you reset them, in case you're having issues-
+#
+# This file does NOT support reloading.
+# -----------------------------------------------------------------------------------------------------
+
+# How we should save player-related data, emails, logs, regions and other server settings.
+# Available: local (just works, no configuration needed, uses SQLite)
+#            remote (requires Host, Database, User, Password set below, supports MySQL/MariaDB)
+Type: 'remote'
+
+# The remote database connection settings. Only configure if using remote database.
+Host: 'localhost:13306'
+Database: 'chatcontrol'
+User: 'minecraft'
+Password: 'minecraft'
+
+# Expert. HikariCP max pool size. Bump to 30-50 if you see "request timed out"
+# under heavy join bursts. Ignored when Type is local.
+Pool_Size: 10
+
+# Expert. Milliseconds HikariCP waits for a free connection before throwing.
+Connection_Timeout_Ms: 5000
+
+# Expert. Milliseconds between SELECT 1 keepalive pings on idle connections.
+# Lower to 30000 if your NAT/firewall drops idle TCP. Must be >= 30000.
+Keepalive_Ms: 60000
+
+# Expert. Max lifetime of a pooled connection in milliseconds. Must be >= 30000.
+Max_Lifetime_Ms: 1800000
+
+# Expert. Custom JDBC URL. Custom drivers require a plugin loading before ChatControl.
+Line: "jdbc:{driver}://{host}/{database}?autoReconnect=true&characterEncoding=UTF-8&tcpKeepAlive=true&useSSL=false"

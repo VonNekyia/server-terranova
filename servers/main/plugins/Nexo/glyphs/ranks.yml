@@ -1,0 +1,252 @@
+# Rank glyphs
+#
+# Two sets live here, and they are not interchangeable:
+#
+#   1. Chat tags  - typed in chat via a :placeholder:, gated by a permission.
+#                   All use the 18px `default/chat` art at height 10 / ascent 9
+#                   so every tag sits on the same baseline.
+#   2. Rank icons - the 78x20 `medieval_ranks` art, inserted by character
+#                   (rank prefixes, menus). No placeholder, so normal chat
+#                   cannot trigger them.
+#
+# Never change a `char` that is already in use - it is stored in rank prefixes
+# and baked into the generated resource pack.
+
+
+# ---------------------------------------------------------------------------
+# 1. Chat tags
+# ---------------------------------------------------------------------------
+
+farmer_tag:
+  texture: default/chat/farmer_tag
+  char: ꐐ
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':farmer:'
+  permission: oraxen.emoji.farmer
+
+explorer_tag:
+  texture: default/chat/explorer_tag
+  char: ꐑ
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':explorer:'
+  permission: oraxen.emoji.explorer
+
+knight_tag:
+  texture: default/chat/knight_tag
+  char: ꐒ
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':knight:'
+  permission: oraxen.emoji.knight
+
+lord_tag:
+  texture: default/chat/lord_tag
+  char: ꐓ
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':lord:'
+  permission: oraxen.emoji.lord
+
+prince_tag:
+  texture: default/chat/prince_tag
+  char: ꐔ
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':prince:'
+  permission: oraxen.emoji.prince
+
+king_tag:
+  texture: default/chat/king_tag
+  char: ꐕ
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':king:'
+  permission: oraxen.emoji.king
+
+god_tag:
+  texture: default/chat/god_tag
+  char: ꐗ
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':god:'
+  permission: oraxen.emoji.god
+
+mod_tag:
+  texture: default/chat/mod_tag
+  char: Ⱋ
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':mod:'
+  permission: oraxen.emoji.mod
+
+player_tag:
+  texture: default/chat/player_tag
+  char: ┬
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':player:'
+  permission: oraxen.emoji.player
+
+helper_tag:
+  texture: default/chat/helper_tag
+  char: Ⱟ
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':sup:'
+  permission: oraxen.emoji.helper
+
+admin_tag:
+  texture: default/chat/admin_tag
+  char: ♆
+  ascent: 9
+  height: 10
+  placeholders:
+    - ':admin:'
+  permission: oraxen.emoji.admin
+
+# No `default/chat/dev_tag` art exists, so this one keeps the medieval_ranks
+# texture and will look slightly different from the tags above.
+dev_tag:
+  texture: medieval_ranks/dev
+  char: ꐖ
+  ascent: 8
+  height: 9
+  placeholders:
+    - ':dev:'
+  permission: oraxen.emoji.dev
+
+
+# ---------------------------------------------------------------------------
+# 2. Rank icons
+# ---------------------------------------------------------------------------
+
+admin:
+  texture: medieval_ranks/admin
+  char: ꐜ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+artist:
+  texture: medieval_ranks/artist
+  char: ꐟ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+builder:
+  texture: medieval_ranks/builder
+  char: ꐠ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+dev:
+  texture: medieval_ranks/dev
+  char: ꐡ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+elite:
+  texture: medieval_ranks/elite
+  char: ꐢ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+helper:
+  texture: medieval_ranks/helper
+  char: ꐣ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+member:
+  texture: medieval_ranks/member
+  char: ꐤ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+mod:
+  texture: medieval_ranks/mod
+  char: ꐥ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+mvp:
+  texture: medieval_ranks/mvp
+  char: ꐦ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+mvp_plus:
+  texture: medieval_ranks/mvp_plus
+  char: ꐧ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+nitro:
+  texture: medieval_ranks/nitro
+  char: ꐨ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+owner:
+  texture: medieval_ranks/owner
+  char: ꐩ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+pro:
+  texture: medieval_ranks/pro
+  char: ꐪ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+staff:
+  texture: medieval_ranks/staff
+  char: ꐫ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+team:
+  texture: medieval_ranks/team
+  char: ꐬ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+vip:
+  texture: medieval_ranks/vip
+  char: ꐭ
+  ascent: 8
+  height: 9
+  is_emoji: true
+
+vip_plus:
+  texture: medieval_ranks/vip_plus
+  char: ꐮ
+  ascent: 8
+  height: 9
+  is_emoji: true

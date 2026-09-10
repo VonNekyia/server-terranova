@@ -1,0 +1,6 @@
+database:
+  host: localhost
+  port: 13306
+  database: proficisci
+  username: minecraft
+  password: minecraft

@@ -1,3 +1,0 @@
-#CloudNet auto eula (https://account.mojang.com/documents/minecraft_eula)
-#Thu Sep 10 23:40:56 CEST 2026
-eula=true

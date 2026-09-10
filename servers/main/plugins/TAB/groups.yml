@@ -1,0 +1,25 @@
+#Owner:
+#  tabprefix: "&0&l[&a&lOwner&0&l] &a"
+#  tagprefix: "&2&lOwner &a"
+Player:
+  tabprefix: "&0&l[&7&lPlayer&0&l] &3"
+  tagprefix: "&2&lPlayer &3"
+
+# Default settings for all groups. A group's own section overrides these.
+# Valid properties: tagprefix, tagsuffix, tabprefix, tabsuffix, customtabname
+#
+# These use TAB's native LuckPerms placeholders. ChatControl registers its
+# PlaceholderAPI expansion after TAB enables, which can leave ChatControl
+# placeholders rendered literally in the tab list.
+_DEFAULT_:
+  tabprefix: "%luckperms-prefix%"
+  tagprefix: "%luckperms-prefix%"
+  customtabname: "%player%"
+  tabsuffix: "%luckperms-suffix%"
+  tagsuffix: "%luckperms-suffix%"
+
+per-world:
+  world1:
+    Owner:
+      tabprefix: "&0&l[&a&lOwner&0&l] &a"
+      tagprefix: "&2&lOwner &a"

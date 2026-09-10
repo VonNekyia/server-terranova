@@ -3,14 +3,18 @@ setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 rem ---------------------------------------------------------------------------
-rem Startet das Terranova-Netzwerk: MariaDB, Redis und danach CloudNet.
+rem Startet das Terranova-Netzwerk: MariaDB, Redis und danach Proxy und Server.
 rem Doppelklick genuegt. Der erste Start laedt MariaDB und Redis einmalig
 rem herunter.
 rem
 rem Die Datenbanken laufen bewusst hier und nicht in einem Plugin: Paper liest
 rem server.properties und die Plugins ihre Configs, bevor ein Plugin ueberhaupt
-rem laden koennte. CloudNet startet die Dienste, sobald es selbst oben ist -
-rem beide Datenbanken muessen also schon vorher stehen.
+rem laden koennte. Beide muessen also schon stehen, bevor der erste Server
+rem hochfaehrt.
+rem
+rem Die Server selbst startet scripts\network.ps1. Jeder bekommt sein eigenes
+rem Konsolenfenster, dieses hier bleibt als Aufsicht und startet neu, was
+rem abstuerzt. Strg+C faehrt alles wieder herunter.
 rem ---------------------------------------------------------------------------
 
 rem --- MariaDB ---------------------------------------------------------------
@@ -36,10 +40,6 @@ rem   luckperms        LuckPerms/config.yml -> database
 rem   proficisci       Proficisci/config.yml -> database
 rem   bountyfulseas    BountyfulSeas/config.yml -> name
 rem   husksync         HuskSync/config.yml -> database.credentials.database
-rem
-rem Die frueher angelegte Datenbank "network" ist entfallen. Sie stammte aus
-rem dem abgeloesten Interconnect-Plugin und blieb immer leer; die vorhandene
-rem leere Datenbank kann von Hand geloescht werden.
 set "DATABASES=nations betonquest chatcontrol interactivechat luckperms proficisci bountyfulseas husksync"
 
 rem --- Redis -----------------------------------------------------------------
@@ -58,13 +58,6 @@ set "REDIS_COMMIT=794a883a083a317bc23fbbabc83a3c54abab0799"
 set "REDIS_RAW=https://raw.githubusercontent.com/zkteco-home/redis-windows/%REDIS_COMMIT%"
 set "REDIS_SERVER=%REDIS_HOME%\redis-server.exe"
 set "REDIS_CLI=%REDIS_HOME%\redis-cli.exe"
-
-rem --- CloudNet --------------------------------------------------------------
-rem Der Launcher laedt CloudNet selbst nach und startet den Knoten. Der
-rem Speicher hier gilt nur fuer den Launcher, nicht fuer den Knoten und erst
-rem recht nicht fuer die Server - das steht in network\launcher.cnl bzw. in
-rem den Tasks unter network\tasks.
-set "CLOUDNET_HOME=network"
 
 rem --- 1. MariaDB einmalig besorgen ------------------------------------------
 if not exist "%MYSQLD%" (
@@ -111,7 +104,7 @@ if not exist "%MARIADB_DATA%\mysql" (
 )
 
 rem --- 4. Reste eines abgestuerzten Laufs beenden ----------------------------
-rem Kein taskkill mehr auf mysqld.exe: auf dieser Maschine laeuft daneben ein
+rem Kein taskkill auf mysqld.exe: auf dieser Maschine laeuft daneben ein
 rem separat installierter MariaDB-Dienst auf Port 3306, den ein pauschales
 rem taskkill mit erwischt haette. Stattdessen gezielt die eigene Instanz auf
 rem Port %MARIADB_PORT% ansprechen.
@@ -147,11 +140,10 @@ for %%D in (%DATABASES%) do (
     "%MYSQL%" -h 127.0.0.1 -P %MARIADB_PORT% -u root --protocol=tcp -e "CREATE DATABASE IF NOT EXISTS `%%D` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >nul 2>&1
 )
 
-rem Alle Dienste laufen auf dieser Maschine, deshalb reichen localhost und
+rem Alle Server laufen auf dieser Maschine, deshalb reichen localhost und
 rem 127.0.0.1 - MySQL behandelt beide als verschiedene Hosts, es braucht also
-rem beide Eintraege. Frueher stand hier zusaetzlich '%%'@ALL PRIVILEGES ON *.*
-rem WITH GRANT OPTION; fuer einen Einzelserver war das egal, fuer ein Netzwerk
-rem mit mehreren verbindenden Diensten ist es das nicht mehr.
+rem beide Eintraege. Frueher stand hier ALL PRIVILEGES ON *.* fuer '%%'; fuer
+rem einen Einzelserver war das egal, fuer ein Netzwerk ist es das nicht mehr.
 for %%H in (localhost 127.0.0.1) do (
     "%MYSQL%" -h 127.0.0.1 -P %MARIADB_PORT% -u root --protocol=tcp -e "CREATE USER IF NOT EXISTS '%DB_USER%'@'%%H' IDENTIFIED BY '%DB_PASS%';" >nul 2>&1
     for %%D in (%DATABASES%) do (
@@ -172,64 +164,31 @@ if not errorlevel 1 goto redisready
 set /a WAITED+=1
 if %WAITED% GEQ 30 (
     echo [start] FEHLER: Redis antwortet nicht.
-    pause
-    exit /b 1
+    goto shutdown
 )
 ping -n 2 127.0.0.1 >nul
 goto waitredis
 :redisready
 echo [start] Redis laeuft.
 
-rem --- 8. Java 25 suchen -----------------------------------------------------
-rem CloudNet 4.0.0-RC17 besteht auf genau Java 25 und weigert sich unter 26 zu
-rem starten. Auf dieser Maschine zeigt "java" auf Corretto 26, deshalb wird
-rem hier gezielt ein Java 25 gesucht statt sich auf den PATH zu verlassen.
-rem Mit TERRANOVA_JAVA25=<JDK-Verzeichnis> laesst sich die Suche uebergehen.
-set "JAVA25="
-
-if defined TERRANOVA_JAVA25 (
-    if exist "%TERRANOVA_JAVA25%\bin\java.exe" set "JAVA25=%TERRANOVA_JAVA25%\bin\java.exe"
-)
-
-if not defined JAVA25 call :findjava25 "C:\Program Files\Eclipse Adoptium\jdk-25*"
-if not defined JAVA25 call :findjava25 "C:\Program Files\Amazon Corretto\jdk25*"
-if not defined JAVA25 call :findjava25 "C:\Program Files\Java\jdk-25*"
-if not defined JAVA25 call :findjava25 "C:\Program Files\Microsoft\jdk-25*"
-if not defined JAVA25 call :findjava25 "%USERPROFILE%\.jdks\*25*"
-
-rem Zuletzt: vielleicht ist das Java im PATH ohnehin schon eine 25.
-if not defined JAVA25 (
-    java -version 2>&1 | findstr /C:"version \"25" >nul
-    if not errorlevel 1 set "JAVA25=java"
-)
-
-if not defined JAVA25 (
-    echo [start] FEHLER: CloudNet braucht Java 25, es wurde keines gefunden.
-    echo [start]        Ein Java 25 installieren ^(Adoptium, Corretto, ...^) oder
-    echo [start]        TERRANOVA_JAVA25 auf das JDK-Verzeichnis setzen.
-    goto :shutdown
-)
-echo [start] Java 25: %JAVA25%
-
-rem --- 9. Velocity-Forwarding-Secret sicherstellen ----------------------------
-rem Erzeugt beim ersten Mal ein Secret und traegt es in jeden Backend-Server
-rem ein. Laeuft bei jedem Start, damit ein neu angelegter Dienst es ebenfalls
-rem bekommt. Das Secret selbst bleibt ausserhalb des Repositories.
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\sync-forwarding-secret.ps1"
+rem --- 8. Paper, Configs und Plugins in die Server legen ----------------------
+rem Jedes Jar liegt genau einmal im Repository, naemlich unter templates\.
+rem Hier wird es in die Serververzeichnisse kopiert - und dabei das
+rem Velocity-Secret eingetragen, das ausserhalb des Repositories bleibt.
+echo [start] Server werden bestueckt...
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\sync-servers.ps1"
 if errorlevel 1 (
-    echo [start] FEHLER: Forwarding-Secret konnte nicht gesetzt werden.
-    goto :shutdown
+    echo [start] FEHLER: Server konnten nicht bestueckt werden.
+    goto shutdown
 )
 
-rem --- 10. CloudNet starten --------------------------------------------------
-rem Der Knoten startet Proxy, main, build und farm selbst. Dungeons entstehen
-rem erst auf Zuruf:  create by mining <anzahl> --start
-echo [start] CloudNet wird gestartet...
-pushd "%CLOUDNET_HOME%"
-"%JAVA25%" -Xms128M -Xmx128M -XX:+UseZGC -XX:+PerfDisableSharedMem -jar launcher.jar
-popd
+rem --- 9. Proxy und Server starten -------------------------------------------
+rem network.ps1 bleibt im Vordergrund und beaufsichtigt die Server, bis es mit
+rem Strg+C beendet wird. Danach laeuft dieses Skript hier weiter und raeumt
+rem die Datenbanken ab.
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\network.ps1"
 
-rem --- 11. Redis und MariaDB sauber herunterfahren ----------------------------
+rem --- 10. Redis und MariaDB sauber herunterfahren ----------------------------
 :shutdown
 echo [start] Redis wird heruntergefahren...
 "%REDIS_CLI%" -h 127.0.0.1 -p %REDIS_PORT% shutdown nosave >nul 2>&1
@@ -239,20 +198,3 @@ echo [start] MariaDB wird heruntergefahren...
 ping -n 4 127.0.0.1 >nul
 
 pause
-exit /b 0
-
-rem ---------------------------------------------------------------------------
-rem Sucht im uebergebenen Verzeichnismuster ein JDK und uebernimmt es nur, wenn
-rem java -version wirklich eine 25 meldet. Der Verzeichnisname allein reicht
-rem nicht: .jdks\corretto-25.0.2 heisst so, muss es aber nicht sein.
-rem ---------------------------------------------------------------------------
-:findjava25
-for /d %%D in (%~1) do (
-    if not defined JAVA25 (
-        if exist "%%~fD\bin\java.exe" (
-            "%%~fD\bin\java.exe" -version 2>&1 | findstr /C:"version \"25" >nul
-            if not errorlevel 1 set "JAVA25=%%~fD\bin\java.exe"
-        )
-    )
-)
-goto :eof

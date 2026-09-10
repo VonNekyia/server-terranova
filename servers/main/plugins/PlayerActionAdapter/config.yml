@@ -1,0 +1,9 @@
+# MySQL connection settings. Restart the server after changing these values.
+# Defaults preserve the previous database connection settings.
+database:
+  # Hostname or IP address of the MySQL server (without a port).
+  host: "localhost"
+  port: 13306
+  name: "nations"
+  username: "minecraft"
+  password: "minecraft"

@@ -1,12 +1,34 @@
 # ---------------------------------------------------------------------------
-# Legt das Velocity-Forwarding-Secret an und traegt es in jeden Backend-Server
-# ein. Wird von start.bat bei jedem Start aufgerufen: das ist billig und heilt
-# sich selbst, sobald ein neuer Dienst dazukommt.
+# Legt das Velocity-Forwarding-Secret an.
 #
-# Das Secret ist der einzige Schutz der Backends. Mit modern forwarding laufen
-# sie auf online-mode=false und glauben jedem, der sie erreicht - nur wer das
-# Secret kennt, darf Spieler durchreichen. Deshalb steht es in einer Datei,
-# die .gitignore ausschliesst, und nicht im Repository.
+# Warum nur die Datei und nicht die Server-Configs:
+#
+# CloudNet richtet die Weiterleitung selbst ein. Es schreibt server-ip,
+# server-port und online-mode in die server.properties jedes Backends und setzt
+# in paper-global.yml proxies.velocity.enabled bei jedem Start wieder auf
+# false - CloudNet arbeitet standardmaessig mit legacy forwarding (der alte
+# BungeeCord-Weg), und die erzeugte velocity.toml steht entsprechend auf
+# player-info-forwarding-mode = "legacy".
+#
+# Dagegen anzuschreiben bringt nichts: der naechste Start setzt es zurueck, und
+# in der Zwischenzeit steht ein Geheimnis in einer versionierten Datei. Also
+# wird hier nur die Secret-Datei gepflegt, die Velocity ohnehin liest.
+#
+# Solange alle Dienste auf 127.0.0.1 gebunden sind, ist legacy forwarding
+# vertretbar: die Backends laufen zwar auf online-mode=false und glauben jedem,
+# der sie erreicht, aber erreichen kann sie nur, wer schon auf der Maschine
+# ist. Sobald ein Backend ueber 127.0.0.1 hinaus erreichbar wird, ist das nicht
+# mehr wahr - dann auf modern forwarding umstellen:
+#
+#   1. in network/local/tasks/*.json der Backends "disableIpRewrite": true
+#      setzen, damit CloudNet paper-global.yml in Ruhe laesst
+#   2. in der velocity.toml des Proxy-Templates
+#      player-info-forwarding-mode = "modern"
+#   3. in paper-global.yml jedes Backends proxies.velocity.enabled: true und
+#      secret auf den Inhalt von forwarding.secret
+#
+# Das ist bewusst nicht vorkonfiguriert - es will einmal von Hand mit einem
+# echten Verbindungsversuch geprueft werden.
 # ---------------------------------------------------------------------------
 param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot)
@@ -31,44 +53,12 @@ if (-not (Test-Path $secretFile)) {
     $secret = [System.IO.File]::ReadAllText($secretFile).Trim()
 }
 
-# Alle Backends: die festen Dienste und die Templates, aus denen neue entstehen.
-$targets = @()
-$targets += Get-ChildItem (Join-Path $Root 'network\local\services') -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -notlike 'Proxy*' }
-$targets += Get-ChildItem (Join-Path $Root 'network\local\templates') -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -ne 'Proxy' -and $_.Name -ne 'Global' } |
-    ForEach-Object { Get-ChildItem $_.FullName -Directory -ErrorAction SilentlyContinue }
-
-foreach ($t in $targets) {
-    # --- paper-global.yml: den velocity-Block unter proxies: setzen ---------
-    $pg = Join-Path $t.FullName 'config\paper-global.yml'
-    if (Test-Path $pg) {
-        $lines = [System.IO.File]::ReadAllLines($pg)
-        $inVelocity = $false
-        $changed = $false
-        for ($i = 0; $i -lt $lines.Length; $i++) {
-            if ($lines[$i] -match '^\s{2}velocity:\s*$') { $inVelocity = $true; continue }
-            if ($inVelocity) {
-                if ($lines[$i] -match '^\s{4}enabled:') { $lines[$i] = '    enabled: true'; $changed = $true; continue }
-                if ($lines[$i] -match '^\s{4}online-mode:') { $lines[$i] = '    online-mode: true'; $changed = $true; continue }
-                if ($lines[$i] -match '^\s{4}secret:') { $lines[$i] = "    secret: '$secret'"; $changed = $true; continue }
-                # Ende des Blocks: alles, was flacher eingerueckt ist
-                if ($lines[$i] -notmatch '^\s{4}') { $inVelocity = $false }
-            }
-        }
-        if ($changed) { [System.IO.File]::WriteAllLines($pg, $lines) }
-    }
-
-    # --- server.properties: online-mode aus, Proxy darf verbinden ----------
-    $sp = Join-Path $t.FullName 'server.properties'
-    if (Test-Path $sp) {
-        $lines = [System.IO.File]::ReadAllLines($sp)
-        for ($i = 0; $i -lt $lines.Length; $i++) {
-            if ($lines[$i] -match '^online-mode=') { $lines[$i] = 'online-mode=false' }
-            if ($lines[$i] -match '^prevent-proxy-connections=') { $lines[$i] = 'prevent-proxy-connections=false' }
-        }
-        [System.IO.File]::WriteAllLines($sp, $lines)
-    }
+# Der laufende Proxy-Dienst bekommt dieselbe Datei - CloudNet kopiert das
+# Template nur beim Anlegen, ein spaeter erzeugtes Secret kaeme sonst nie an.
+$proxyServices = Get-ChildItem (Join-Path $Root 'network\local\services') -Directory `
+    -Filter 'Proxy-*' -ErrorAction SilentlyContinue
+foreach ($p in $proxyServices) {
+    [System.IO.File]::WriteAllText((Join-Path $p.FullName 'forwarding.secret'), $secret)
 }
 
-Write-Output "[secret] Forwarding in $($targets.Count) Backend(s) eingetragen"
+Write-Output "[secret] Secret liegt bereit (Proxy-Template + $($proxyServices.Count) Proxy-Dienst(e))"

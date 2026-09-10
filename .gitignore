@@ -33,6 +33,15 @@ network/local/records/
 network/local/database/
 network/local/.consolehistory
 
+# Plugin-Jars in den Dienstverzeichnissen sind Kopien. Die Quelle ist immer ein
+# Template unter network/local/templates/ - CloudNet kopiert sie bei jedem Start
+# herunter. Versioniert werden in einem Dienst nur seine eigenen Configs.
+network/local/services/*/plugins/*.jar
+network/local/services/*/plugins/PlaceholderAPI/expansions/
+
+# Laufzeitdaten des CloudNet-Wrappers in jedem Dienst
+network/local/services/*/.wrapper/
+
 # Dynamische Dungeons: entstehen aus dem Template und werden nach 24 h verworfen.
 # Nur das Template unter network/local/templates/mining/ ist die Quelle.
 network/local/services/mining-*/

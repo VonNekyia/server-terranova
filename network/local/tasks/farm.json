@@ -1,12 +1,15 @@
 {
   "name": "farm",
   "runtime": "jvm",
+  "hostAddress": null,
+  "javaCommand": null,
+  "nameSplitter": "-",
   "disableIpRewrite": false,
   "maintenance": false,
   "autoDeleteOnStop": false,
   "staticServices": true,
-  "associatedNodes": [],
   "groups": [],
+  "associatedNodes": [],
   "deletedFilesAfterStop": [],
   "processConfiguration": {
     "environment": "MINECRAFT_SERVER",
@@ -35,26 +38,29 @@
     ],
     "processParameters": [
       "nogui"
-    ]
+    ],
+    "environmentVariables": {}
   },
   "startPort": 45155,
   "minServiceCount": 1,
-  "includes": [],
   "templates": [
     {
       "prefix": "Global",
       "name": "default",
       "storage": "local",
+      "priority": 0,
       "alwaysCopyToStaticServices": true
     },
     {
       "prefix": "Backend",
       "name": "default",
       "storage": "local",
+      "priority": 0,
       "alwaysCopyToStaticServices": false
     }
   ],
   "deployments": [],
+  "includes": [],
   "properties": {
     "requiredPermission": null,
     "smartConfig": {

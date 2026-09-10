@@ -1,12 +1,15 @@
 {
   "name": "mining",
   "runtime": "jvm",
+  "hostAddress": null,
+  "javaCommand": null,
+  "nameSplitter": "-",
   "disableIpRewrite": false,
   "maintenance": false,
   "autoDeleteOnStop": false,
   "staticServices": true,
-  "associatedNodes": [],
   "groups": [],
+  "associatedNodes": [],
   "deletedFilesAfterStop": [],
   "processConfiguration": {
     "environment": "MINECRAFT_SERVER",
@@ -35,32 +38,36 @@
     ],
     "processParameters": [
       "nogui"
-    ]
+    ],
+    "environmentVariables": {}
   },
   "startPort": 45255,
   "minServiceCount": 0,
-  "includes": [],
   "templates": [
     {
       "prefix": "Global",
       "name": "default",
       "storage": "local",
+      "priority": 0,
       "alwaysCopyToStaticServices": true
     },
     {
       "prefix": "Backend",
       "name": "default",
       "storage": "local",
+      "priority": 0,
       "alwaysCopyToStaticServices": false
     },
     {
       "prefix": "mining",
       "name": "default",
       "storage": "local",
+      "priority": 0,
       "alwaysCopyToStaticServices": false
     }
   ],
   "deployments": [],
+  "includes": [],
   "properties": {
     "requiredPermission": null,
     "smartConfig": {

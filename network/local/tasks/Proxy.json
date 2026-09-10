@@ -1,31 +1,36 @@
 {
   "name": "Proxy",
   "runtime": "jvm",
+  "hostAddress": null,
+  "javaCommand": null,
+  "nameSplitter": "-",
   "disableIpRewrite": false,
   "maintenance": false,
   "autoDeleteOnStop": false,
   "staticServices": true,
-  "associatedNodes": [],
   "groups": [],
+  "associatedNodes": [],
   "deletedFilesAfterStop": [],
   "processConfiguration": {
     "environment": "VELOCITY",
     "maxHeapMemorySize": 512,
     "jvmOptions": [],
-    "processParameters": []
+    "processParameters": [],
+    "environmentVariables": {}
   },
   "startPort": 25565,
   "minServiceCount": 1,
-  "includes": [],
   "templates": [
     {
       "prefix": "Proxy",
       "name": "default",
       "storage": "local",
+      "priority": 0,
       "alwaysCopyToStaticServices": false
     }
   ],
   "deployments": [],
+  "includes": [],
   "properties": {
     "requiredPermission": null,
     "smartConfig": {

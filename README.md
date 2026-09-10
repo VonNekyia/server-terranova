@@ -68,8 +68,8 @@ scripts/
   reap-mining.ps1                        abgelaufene Dungeons abräumen
 network/
   launcher.jar  config.json              CloudNet
-  tasks/*.json                           die fünf Tasks
   local/
+    tasks/*.json                         die fünf Tasks
     templates/
       Global/default/plugins/            Plugins, die jeder Server bekommt
       Backend/default/                   gemeinsame Servereinstellungen
@@ -119,23 +119,35 @@ Zuordnung steht als Kommentar direkt darüber.
 Zugangsdaten für lokale Entwicklung: `minecraft` / `minecraft` auf
 `127.0.0.1:13306`. Redis läuft ohne Passwort auf `127.0.0.1:6379`.
 
-## Das Forwarding-Secret
+## Weiterleitung und das Forwarding-Secret
 
-Mit Velocity modern forwarding laufen die Backends auf `online-mode=false` und
-glauben jedem, der sie erreicht. Das Secret ist ihr einziger Schutz.
+CloudNet richtet die Weiterleitung **selbst** ein: es schreibt `server-ip`,
+`server-port` und `online-mode=false` in die `server.properties` jedes Backends
+und benutzt dabei standardmäßig *legacy forwarding* — den alten
+BungeeCord-Weg. Die von CloudNet erzeugte `velocity.toml` steht entsprechend
+auf `player-info-forwarding-mode = "legacy"`, und `paper-global.yml` wird bei
+jedem Start wieder auf `proxies.velocity.enabled: false` gesetzt.
 
-`scripts\sync-forwarding-secret.ps1` erzeugt es beim ersten Start unter
-`network\local\templates\Proxy\default\forwarding.secret` und trägt es in jeden
-Backend-Server ein. Die Datei ist in `.gitignore` — im Repository steht in
-`paper-global.yml` immer `secret: ''`.
+`scripts\sync-forwarding-secret.ps1` pflegt deshalb nur die Secret-Datei unter
+`network\local	emplates\Proxy\defaultorwarding.secret`, die in
+`.gitignore` steht. In die Server-Configs schreibt es nichts — dagegen
+anzuschreiben würde beim nächsten Start ohnehin zurückgesetzt und hinterließe
+in der Zwischenzeit ein Geheimnis in einer versionierten Datei.
 
-Das hat einen Haken: nach jedem Start meldet git die betroffenen
-`config/paper-global.yml` als geändert, weil dort dann das echte Secret steht.
-Einmalig ruhigstellen:
+Solange alle Dienste auf `127.0.0.1` gebunden sind, ist das vertretbar: die
+Backends glauben zwar jedem, der sie erreicht, aber erreichen kann sie nur, wer
+schon auf der Maschine ist. **Sobald ein Backend darüber hinaus erreichbar
+wird, gilt das nicht mehr** — dann auf modern forwarding umstellen:
 
-```
-git update-index --skip-worktree network/local/services/*/config/paper-global.yml
-```
+1. in `network/local/tasks/*.json` der Backends `"disableIpRewrite": true`
+   setzen, damit CloudNet `paper-global.yml` in Ruhe lässt
+2. in der `velocity.toml` des Proxy-Templates
+   `player-info-forwarding-mode = "modern"`
+3. in `paper-global.yml` jedes Backends `proxies.velocity.enabled: true` und
+   `secret` auf den Inhalt von `forwarding.secret`
+
+Das ist bewusst nicht vorkonfiguriert: es will einmal von Hand mit einem echten
+Verbindungsversuch geprüft werden.
 
 ## Speicher
 

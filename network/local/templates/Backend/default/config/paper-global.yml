@@ -113,7 +113,7 @@ proxies:
     online-mode: true
   proxy-protocol: false
   velocity:
-    enabled: true
+    enabled: false
     online-mode: true
     secret: ''
 scoreboards:

@@ -1,16 +1,19 @@
 {
-  "name": "build",
+  "name": "main",
   "runtime": "jvm",
+  "hostAddress": null,
+  "javaCommand": null,
+  "nameSplitter": "-",
   "disableIpRewrite": false,
   "maintenance": false,
   "autoDeleteOnStop": false,
   "staticServices": true,
-  "associatedNodes": [],
   "groups": [],
+  "associatedNodes": [],
   "deletedFilesAfterStop": [],
   "processConfiguration": {
     "environment": "MINECRAFT_SERVER",
-    "maxHeapMemorySize": 2048,
+    "maxHeapMemorySize": 4096,
     "jvmOptions": [
       "-XX:+AlwaysPreTouch",
       "-XX:+DisableExplicitGC",
@@ -35,26 +38,28 @@
     ],
     "processParameters": [
       "nogui"
-    ]
+    ],
+    "environmentVariables": {}
   },
-  "startPort": 45055,
+  "startPort": 44955,
   "minServiceCount": 1,
-  "includes": [],
   "templates": [
     {
       "prefix": "Global",
       "name": "default",
       "storage": "local",
+      "priority": 0,
       "alwaysCopyToStaticServices": true
     },
     {
-      "prefix": "Backend",
+      "prefix": "main",
       "name": "default",
       "storage": "local",
-      "alwaysCopyToStaticServices": false
+      "alwaysCopyToStaticServices": true
     }
   ],
   "deployments": [],
+  "includes": [],
   "properties": {
     "requiredPermission": null,
     "smartConfig": {

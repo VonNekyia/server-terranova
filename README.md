@@ -68,12 +68,14 @@ vorher sauber.
 start.bat                   MariaDB, Redis, dann Proxy und Server
 scripts/
   network.ps1               startet Proxy und Server, beaufsichtigt sie
-  sync-servers.ps1          Paper, Configs, Plugin-Jars und Secret in die Server
+  sync-servers.ps1          Paper, Configs, Plugin-Jars, server.properties
   dungeon.ps1               Dungeons öffnen, schliessen, auflisten
   reap-mining.ps1           abgelaufene Dungeons abräumen
+  restart-daily.ps1         täglicher Neustart um 04:00
+  rcon.ps1                  RCON-Client, damit "stop" wirklich stoppt
 proxy/
   velocity.toml             versioniert
-  velocity-*.jar            nicht versioniert
+  velocity-*.jar            versioniert
   forwarding.secret         nicht versioniert
 servers/
   main/  build/  farm/      versioniert: server.properties + Plugin-Configs
@@ -136,8 +138,33 @@ reicht UUID und Skin signiert weiter, das Backend prüft die Signatur gegen
 Das Secret erzeugt `sync-servers.ps1` beim ersten Start und trägt es in
 `config\paper-global.yml` jedes Servers ein. Beide sind in `.gitignore` — das
 Secret ist der einzige Schutz der Backends und gehört nicht ins Repository.
-Deshalb ist `servers/*/config/` als Ganzes nicht versioniert; die Vorlage dafür
-liegt in `templates/common/config/`.
+Deshalb sind `servers/*/config/` und `servers/*/server.properties` nicht
+versioniert; die Vorlagen dafür liegen in `templates/common/config/` und
+`templates/<name>/server.properties`.
+
+## Sauber stoppen
+
+Einen Paper-Server unter Windows sauber herunterzufahren geht nur über RCON.
+Die JVM hat kein Fenster mit Nachrichtenschleife, `CloseMainWindow()` läuft ins
+Leere, und `taskkill` ohne `/F` antwortet *"Die Beendigung dieses Prozesses muss
+erzwungen werden"*. Bliebe der harte Abschuss — und der kostet bei mains
+500-MB-Welt irgendwann Chunks.
+
+`scripts\rcon.ps1` schickt deshalb ein echtes `stop`. Im Log steht danach
+`All chunks are saved` und `All RegionFile I/O tasks to complete`. RCON läuft je
+Server auf Port + 100 (main 25666, build 25667, farm 25668, Dungeons 25671+),
+gebunden an `127.0.0.1`; das Passwort steht in `runtime\rcon.secret`.
+
+### Täglicher Neustart
+
+`scripts\restart-daily.ps1` stoppt main, build und farm nacheinander mit zwei
+Minuten Abstand — hochfahren tut sie die Aufsicht in `network.ps1`. So gibt es
+genau eine Stelle, die Server startet. Dungeons bleiben unberührt.
+
+Als geplante Aufgabe einrichten, einmalig in einer Konsole als Administrator —
+`schtasks /Create /TN "Terranova Neustart" /SC DAILY /ST 04:00 /TR "..."` mit
+dem vollen Pfad zu `restart-daily.ps1`; der genaue Aufruf steht als Kommentar
+im Skript.
 
 ## Speicher
 
@@ -156,9 +183,9 @@ Nicht im Repository, weil zur Laufzeit erzeugt oder heruntergeladen:
 | --- | --- |
 | `runtime/` | MariaDB und Redis, lädt `start.bat` selbst |
 | `servers/*/*.jar`, `servers/*/plugins/*.jar` | Kopien aus `templates/` |
-| `servers/*/config/`, `eula.txt`, `bukkit.yml`, `spigot.yml` | dito, plus das Forwarding-Secret |
+| `servers/*/config/`, `server.properties`, `eula.txt`, `bukkit.yml`, `spigot.yml` | dito; enthalten Forwarding-Secret und RCON-Passwort |
 | `servers/mining-*/` | Dungeons, nach 24 h ohnehin weg |
-| `proxy/forwarding.secret`, `proxy/*.jar` | Geheimnis bzw. Kopie |
+| `proxy/forwarding.secret`, `runtime/rcon.secret` | Geheimnisse |
 | `**/world/`, `**/logs/`, `**/cache/`, `**/libraries/`, `**/versions/` | Laufzeitdaten |
 | `**/plugins/**/libs/`, `**/translations/` | laden die Plugins selbst |
 | `**/plugins/**/*.db`, `*.mv.db` | lokale Dateidatenbanken; die echten Daten liegen in MariaDB |

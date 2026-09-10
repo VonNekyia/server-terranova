@@ -30,6 +30,8 @@ network/launcher.cnl
 network/local/registry
 network/local/perms.json
 network/local/records/
+network/local/database/
+network/local/.consolehistory
 
 # Dynamische Dungeons: entstehen aus dem Template und werden nach 24 h verworfen.
 # Nur das Template unter network/local/templates/mining/ ist die Quelle.

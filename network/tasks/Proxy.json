@@ -1,0 +1,47 @@
+{
+  "name": "Proxy",
+  "runtime": "jvm",
+  "disableIpRewrite": false,
+  "maintenance": false,
+  "autoDeleteOnStop": false,
+  "staticServices": true,
+  "associatedNodes": [],
+  "groups": [],
+  "deletedFilesAfterStop": [],
+  "processConfiguration": {
+    "environment": "VELOCITY",
+    "maxHeapMemorySize": 512,
+    "jvmOptions": [],
+    "processParameters": []
+  },
+  "startPort": 25565,
+  "minServiceCount": 1,
+  "includes": [],
+  "templates": [
+    {
+      "prefix": "Proxy",
+      "name": "default",
+      "storage": "local",
+      "alwaysCopyToStaticServices": false
+    }
+  ],
+  "deployments": [],
+  "properties": {
+    "requiredPermission": null,
+    "smartConfig": {
+      "enabled": false,
+      "priority": 10,
+      "directTemplatesAndInclusionsSetup": true,
+      "preparedServices": 0,
+      "dynamicMemoryAllocation": false,
+      "dynamicMemoryAllocationRange": 256,
+      "percentOfPlayersToCheckShouldAutoStopTheServiceInFuture": 0,
+      "autoStopTimeByUnusedServiceInSeconds": 180,
+      "percentOfPlayersForANewServiceByInstance": 100,
+      "forAnewInstanceDelayTimeInSeconds": 300,
+      "minNonFullServices": 0,
+      "templateInstaller": "INSTALL_ALL",
+      "maxServiceCount": -1
+    }
+  }
+}

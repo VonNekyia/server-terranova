@@ -78,7 +78,7 @@ proxy/
   velocity-*.jar            versioniert
   forwarding.secret         nicht versioniert
 servers/
-  main/  build/  farm/      versioniert: server.properties + Plugin-Configs
+  main/  build/  farm/      versioniert: nur die Plugin-Configs
   mining-*/                 nicht versioniert
 templates/
   common/                   Paper, gemeinsame Configs, gemeinsame Plugin-Jars
@@ -110,9 +110,10 @@ cd ..\BountyfulMining
 gradle deployToTestServer
 ```
 
-Versioniert ist an einem Server nur, was ihm wirklich gehört: seine
-`server.properties` und die Configs seiner Plugins. Paper, die gemeinsamen
-Configs und alle Jars sind Kopien und stehen in `.gitignore`.
+Versioniert ist unter `servers/` nur, was ein Server wirklich selbst besitzt:
+die Configs seiner Plugins. Paper, die gemeinsamen Configs, alle Jars und auch
+`server.properties` entstehen beim Start aus `templates/` und stehen in
+`.gitignore` — in `server.properties` landet das RCON-Passwort.
 
 ## Eine Datenbank hinzufügen
 

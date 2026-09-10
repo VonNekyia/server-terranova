@@ -36,12 +36,12 @@ servers/*/spigot.yml
 servers/mining-*/
 
 # Velocity: das Secret ist der einzige Schutz der Backends und gehoert nicht
-# ins Repository. Die Jars und Logs des Proxys ebensowenig.
+# ins Repository. Das Velocity-Jar dagegen schon - es ist keine Kopie aus
+# templates/, sondern das einzige Exemplar, und ohne es startet ein frischer
+# Klon nicht.
 proxy/forwarding.secret
-proxy/*.jar
 proxy/logs/
 proxy/lang/
-proxy/plugins/*.jar
 
 # Von Paper heruntergeladen oder erzeugt
 **/cache/

@@ -6,71 +6,87 @@
 *.iml
 out/
 
-# Altes Arbeitsverzeichnis
-run/
-
 # ---------------------------------------------------------------------------
-# server/ IST der Arbeitsordner und wird versioniert: Plugin-Jars, Plugin-
-# Configs, Serverconfig und start.bat gehoeren ins Repository.
+# Die festen Server liegen unter network/local/services/<name>/ und werden
+# versioniert - Plugin-Jars, Plugin-Configs und Serverconfig gehoeren ins
+# Repository. Dasselbe gilt fuer die Templates unter network/local/templates/,
+# aus denen CloudNet die Dungeons erzeugt.
 #
 # Ausgenommen ist alles, was zur Laufzeit entsteht oder heruntergeladen wird.
-# Faustregel: was start.bat, Paper oder ein Plugin selbst wiederherstellen
-# kann, wird nicht committet.
+# Faustregel: was start.bat, CloudNet, Paper oder ein Plugin selbst
+# wiederherstellen kann, wird nicht committet.
 # ---------------------------------------------------------------------------
 
-# Von start.bat heruntergeladen und angelegt
-server/mariadb/
+# Von start.bat heruntergeladen und angelegt: MariaDB und Redis samt Daten
+runtime/
+
+# Von CloudNet selbst heruntergeladen oder erzeugt
+network/launcher/
+network/modules/
+network/temp/
+network/.wrapper/
+network/config.json
+network/launcher.cnl
+network/local/registry
+network/local/perms.json
+network/local/records/
+
+# Dynamische Dungeons: entstehen aus dem Template und werden nach 24 h verworfen.
+# Nur das Template unter network/local/templates/mining/ ist die Quelle.
+network/local/services/mining-*/
+
+# Velocity-Forwarding-Secret: wird beim ersten Start erzeugt und gehoert
+# ausdruecklich nicht ins Repository
+**/forwarding.secret
 
 # Von Paper heruntergeladen oder erzeugt
-server/cache/
-server/libraries/
-server/versions/
-server/logs/
-server/world/
-server/world_nether/
-server/world_the_end/
-server/usercache.json
-server/*.log
-server/.console_history
-server/.paper/
-
-# Abgeloest: MariaDB, Datenbankanlage und Sync laufen jetzt in start.bat
-server/plugins/Interconnect/
-server/plugins/Interconnect-*.jar
+**/cache/
+**/libraries/
+**/versions/
+**/logs/
+network/local/services/*/world/
+network/local/services/*/world_nether/
+network/local/services/*/world_the_end/
+network/local/templates/*/*/world/
+network/local/templates/*/*/world_nether/
+network/local/templates/*/*/world_the_end/
+**/usercache.json
+**/.console_history
+**/.paper/
+*.log
 
 # Heruntergeladene Abhaengigkeiten und Uebersetzungen der Plugins
-server/plugins/**/libs/
-server/plugins/**/lib/
-server/plugins/**/translations/
+**/plugins/**/libs/
+**/plugins/**/lib/
+**/plugins/**/translations/
 
 # Von BountyfulSeas zur Laufzeit aus dem eigenen Jar ausgepackt
-server/plugins/BountyfulSeas/bin/
+**/plugins/BountyfulSeas/bin/
 
 # Laufzeitausgabe der Plugins
-server/plugins/**/logs/
-server/plugins/**/*.log
-server/plugins/**/*.log.lck
-server/plugins/**/.assetCache/
-server/plugins/**/.deobfCachedPacks/
-server/plugins/**/packsquash/
-server/plugins/**/.cache/
-server/plugins/**/.meta/
-server/plugins/bStats/
-server/plugins/spark/
-server/plugins/faststats/
+**/plugins/**/*.log
+**/plugins/**/*.log.lck
+**/plugins/**/.assetCache/
+**/plugins/**/.deobfCachedPacks/
+**/plugins/**/packsquash/
+**/plugins/**/.cache/
+**/plugins/**/.meta/
+**/plugins/bStats/
+**/plugins/spark/
+**/plugins/faststats/
 
 # Lokale Datenbanken (die echten Daten liegen in MariaDB)
-server/plugins/**/*.db
-server/plugins/**/*.sqlite
-server/plugins/**/*.mv.db
+**/plugins/**/*.db
+**/plugins/**/*.sqlite
+**/plugins/**/*.mv.db
 
 # Generierte Ausgabe einzelner Plugins
 # Von BountyfulSeas aus den Fischdefinitionen erzeugt. Wird bei jedem Start
 # neu geschrieben und vergibt custom_model_data neu, was bei parallelem
 # Arbeiten Konflikte und doppelte IDs erzeugt hat. Die Quelle sind die
 # Dateien unter BountyfulSeas/fishes - neue Items dort eintragen.
-server/plugins/Nexo/items/bountyfulseas/fish.yml
-server/plugins/Nexo/pack/pack.zip
-server/plugins/Pl3xMap/web/tiles/
-server/plugins/FastAsyncWorldEdit/history/
-server/plugins/FastAsyncWorldEdit/clipboard/
+**/plugins/Nexo/items/bountyfulseas/fish.yml
+**/plugins/Nexo/pack/pack.zip
+**/plugins/Pl3xMap/web/tiles/
+**/plugins/FastAsyncWorldEdit/history/
+**/plugins/FastAsyncWorldEdit/clipboard/

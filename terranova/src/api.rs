@@ -27,14 +27,9 @@ use crate::{mines, secrets};
 /// geht. Ohne das merkt der Server nie, dass ein Zuschauer weg ist.
 const SSE_TICK: Duration = Duration::from_secs(15);
 
-/// So lange gilt ein Anmeldecode fuer das Dashboard.
-const CODE_TTL: Duration = Duration::from_secs(60);
-
 pub struct Api {
     sup: Arc<Supervisor>,
     token: String,
-    /// Einmalcodes, mit denen der Browser sich ein Plaetzchen abholt
-    codes: std::sync::Mutex<Vec<(String, std::time::Instant)>>,
 }
 
 /// Bindet den Port und bedient ihn in einem eigenen Thread.
@@ -45,7 +40,6 @@ pub fn serve(sup: Arc<Supervisor>) -> io::Result<(u16, String)> {
     let api = Arc::new(Api {
         sup,
         token: token.clone(),
-        codes: std::sync::Mutex::new(Vec::new()),
     });
     thread::Builder::new()
         .name("terranova-api".into())
@@ -113,20 +107,35 @@ impl Api {
         let seg = req.segments();
         let post = req.method == "POST";
 
-        // Die Oberflaeche selbst ist nur HTML und haelt keine Daten - sie
-        // holt sich gleich danach ein Plaetzchen.
+        // Wer die Seite bekommt, bekommt auch das Sitzungsplaetzchen.
+        //
+        // Das klingt nach Nachlaessigkeit, ist aber keine: bis hierher kommt
+        // nur, wer 127.0.0.1 im Kopf stehen hat - also jemand auf dieser
+        // Maschine. Eine fremde Webseite kann den Browser zwar hierher
+        // schicken, die Antwort aber nicht lesen (andere Herkunft), und ihre
+        // eigenen Anfragen tragen das Plaetzchen wegen SameSite=Strict nicht
+        // mit. Ein Programm auf dieser Maschine koennte ohnehin einfach
+        // runtime\terranova\api.token lesen.
+        //
+        // Vorher gab es dafuer einen Einmalcode ueber die Adresszeile. Der
+        // war streng, aber unbrauchbar: ein Lesezeichen auf das Dashboard
+        // fuehrte auf eine Seite, die nur "Token fehlt" sagte.
         if seg.is_empty() || seg == ["index.html"] {
-            return Reply::Done(Response::html(crate::DASHBOARD.as_bytes().to_vec()));
-        }
-        // Der Einmalcode ist selbst der Nachweis.
-        if post && seg == ["api", "session"] {
-            return self.session(&req);
+            return Reply::Done(
+                Response::html(crate::DASHBOARD.as_bytes().to_vec()).with_header(
+                    "Set-Cookie",
+                    &format!(
+                        "tn_token={}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000",
+                        self.token
+                    ),
+                ),
+            );
         }
         if !self.authorized(&req) {
-            return bad(401, "Token fehlt oder stimmt nicht");
-        }
-        if post && seg == ["api", "login-code"] {
-            return ok_json(json!({ "code": self.new_code() }));
+            return bad(
+                401,
+                "Nicht angemeldet - die Seite neu laden (F5) holt die Sitzung",
+            );
         }
 
         match (post, seg.as_slice()) {
@@ -194,41 +203,6 @@ impl Api {
 
             _ => bad(404, "unbekannter Weg"),
         }
-    }
-
-    /// Ein Code, der einmal und nur kurz gilt.
-    ///
-    /// Damit muss das Token nie in der Adresszeile stehen: dort landet es im
-    /// Verlauf und in jedem Referrer. Der Browser tauscht den Code sofort
-    /// gegen ein Plaetzchen, das kein Skript lesen kann.
-    fn new_code(&self) -> String {
-        let code = secrets::generate();
-        let mut g = self.codes.lock().unwrap_or_else(|e| e.into_inner());
-        g.retain(|(_, t)| t.elapsed() < CODE_TTL);
-        g.push((code.clone(), std::time::Instant::now()));
-        code
-    }
-
-    fn session(&self, req: &Request) -> Reply {
-        let code = serde_json::from_slice::<serde_json::Value>(&req.body)
-            .ok()
-            .and_then(|v| v["code"].as_str().map(String::from))
-            .unwrap_or_default();
-        let mut g = self.codes.lock().unwrap_or_else(|e| e.into_inner());
-        g.retain(|(_, t)| t.elapsed() < CODE_TTL);
-        let Some(i) = g.iter().position(|(c, _)| *c == code) else {
-            return bad(403, "Anmeldecode ungueltig oder abgelaufen");
-        };
-        g.remove(i); // genau einmal
-        Reply::Done(
-            Response::json(json!({ "ok": true }).to_string().into_bytes()).with_header(
-                "Set-Cookie",
-                &format!(
-                    "tn_token={}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400",
-                    self.token
-                ),
-            ),
-        )
     }
 
     fn status(&self) -> Reply {

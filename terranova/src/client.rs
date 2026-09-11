@@ -149,23 +149,13 @@ pub fn shadow_copy(paths: &Paths) -> io::Result<std::path::PathBuf> {
 /// bleiben einem Prozess etwa fuenf Sekunden, und ein Supervisor, der in
 /// dieser Zeit stirbt, nimmt die Pipes aller Server mit.
 pub fn spawn_detached(paths: &Paths, exe: &Path) -> io::Result<u32> {
-    #[cfg(windows)]
-    use std::os::windows::process::CommandExt as _;
-    use std::process::{Command, Stdio};
-
-    let mut cmd = Command::new(exe);
-    cmd.arg("supervise")
-        .arg("--root")
-        .arg(&paths.root)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .current_dir(&paths.root);
-    #[cfg(windows)]
-    cmd.creation_flags(
-        crate::win::DETACHED_PROCESS
-            | crate::win::CREATE_NEW_PROCESS_GROUP
-            | crate::win::CREATE_NO_WINDOW,
-    );
-    Ok(cmd.spawn()?.id())
+    crate::win::spawn_detached(
+        exe,
+        &[
+            std::ffi::OsStr::new("supervise"),
+            std::ffi::OsStr::new("--root"),
+            paths.root.as_os_str(),
+        ],
+        &paths.root,
+    )
 }

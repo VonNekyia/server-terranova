@@ -214,10 +214,16 @@ Eingabe, Dungeons. Sie steckt in der Programmdatei und benutzt ausschließlich
 dieselbe Schnittstelle wie die CLI — sie kann also nichts, was die CLI nicht
 auch kann.
 
+Ein Lesezeichen auf <http://127.0.0.1:25590/> tut es genauso — `terranova
+dashboard` öffnet nur den Browser.
+
 Die Schnittstelle hört nur auf `127.0.0.1` und verlangt ein Token aus
-`runtime\terranova\api.token`. Das Token steht nie in der Adresszeile:
-`terranova dashboard` holt einen Einmalcode, den die Seite sofort gegen ein
-Sitzungsplätzchen tauscht.
+`runtime\terranova\api.token`. Die CLI schickt es als Kopfzeile, der Browser
+bekommt beim Abruf der Seite ein Sitzungsplätzchen (`HttpOnly`,
+`SameSite=Strict`, 30 Tage). Das Token steht nie in der Adresszeile. Wer die
+Seite bekommt, sitzt an diesem Rechner: der `Host`-Kopf muss `127.0.0.1` oder
+`localhost` sein, eine fremde Webseite kann die Antwort nicht lesen, und ihre
+eigenen Anfragen tragen das Plätzchen wegen `SameSite=Strict` nicht mit.
 
 ## Docker
 

@@ -302,18 +302,8 @@ $("#reap").onclick = async () => {
   refresh();
 };
 
-// Der Anmeldecode steht einmalig in der Adresszeile. Gegen ihn gibt es ein
-// Sitzungsplaetzchen - danach verschwindet er aus der Adresse, damit er nicht
-// im Verlauf stehen bleibt.
-(async function start() {
-  const code = new URLSearchParams(location.search).get("code");
-  if (code) {
-    try { await api("/api/session", "POST", { code }); } catch (e) { toast(e.message); }
-    history.replaceState(null, "", location.pathname);
-  }
-  refresh();
-  setInterval(refresh, 2000);
-})();
+refresh();
+setInterval(refresh, 2000);
 </script>
 </body>
 </html>

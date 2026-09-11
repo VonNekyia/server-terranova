@@ -703,22 +703,14 @@ fn mine(paths: &Paths, cfg: &Config, args: &Args) -> ExitCode {
 
 /// Oeffnet das Dashboard im Browser.
 ///
-/// Der Anmeldecode geht einmalig ueber die Adresszeile; die Seite tauscht
-/// ihn sofort gegen ein Sitzungsplaetzchen. Das Token selbst steht damit nie
-/// im Verlauf des Browsers.
+/// Die Seite selbst legt die Sitzung an - ein Lesezeichen darauf tut es
+/// also genauso.
 fn dashboard(paths: &Paths, cfg: &Config) -> ExitCode {
     let c = match need_supervisor(paths, cfg) {
         Ok(c) => c,
         Err(e) => return e,
     };
-    let code = match c.post("/api/login-code", json!({})) {
-        Ok((200, body)) => serde_json::from_str::<serde_json::Value>(&body)
-            .ok()
-            .and_then(|v| v["code"].as_str().map(String::from))
-            .unwrap_or_default(),
-        other => return report(other, ""),
-    };
-    let url = format!("http://127.0.0.1:{}/?code={code}", c.port);
+    let url = format!("http://127.0.0.1:{}/", c.port);
     println!("[terranova] {url}");
     // explorer.exe nimmt eine Adresse und oeffnet den eingestellten Browser.
     let _ = std::process::Command::new("explorer.exe").arg(&url).spawn();

@@ -4,8 +4,10 @@
 //! windows-sys-Namen importiert zu werden: die Werte sind seit Jahrzehnten
 //! fest, die Modulpfade in windows-sys dagegen wandern zwischen Versionen.
 
-use std::ffi::c_void;
+use std::ffi::{c_void, OsStr};
 use std::mem;
+use std::os::windows::ffi::OsStrExt as _;
+use std::path::Path;
 use std::ptr;
 use std::sync::OnceLock;
 
@@ -19,8 +21,8 @@ use windows_sys::Win32::Security::Cryptography::{
 use windows_sys::Win32::System::Console::SetConsoleCtrlHandler;
 use windows_sys::Win32::System::SystemInformation::GetLocalTime;
 use windows_sys::Win32::System::Threading::{
-    GetExitCodeProcess, GetProcessTimes, OpenProcess, QueryFullProcessImageNameW, TerminateProcess,
-    WaitForSingleObject,
+    CreateProcessW, GetExitCodeProcess, GetProcessTimes, OpenProcess, QueryFullProcessImageNameW,
+    TerminateProcess, WaitForSingleObject, PROCESS_INFORMATION, STARTUPINFOW,
 };
 
 // --- Flags fuer std::process::Command::creation_flags ----------------------
@@ -117,6 +119,89 @@ pub fn terminate(pid: u32) -> bool {
         Some(h) => unsafe { TerminateProcess(h.0, 1) != 0 },
         None => false,
     }
+}
+
+/// Startet ein Programm losgeloest: kein Fenster, eigene Prozessgruppe, und
+/// vor allem **ohne geerbte Handles**.
+///
+/// Das letzte ist der Grund, warum hier nicht `std::process::Command` steht.
+/// Rust ruft CreateProcessW immer mit `bInheritHandles = TRUE` auf. Der neue
+/// Supervisor bekaeme damit auch die Ausgabepipe dessen, der ihn gestartet
+/// hat, und hielte sie offen, solange er lebt - `terranova start --detach`
+/// in einer Shell oder in der CI kaeme nie zurueck, obwohl der Aufruf laengst
+/// fertig ist.
+///
+/// Ohne geerbte Handles hat das Kind keine Standardausgabe. Das ist hier
+/// richtig so: der Supervisor schreibt in sein Logbuch, nicht ins Fenster.
+pub fn spawn_detached(exe: &Path, args: &[&OsStr], cwd: &Path) -> std::io::Result<u32> {
+    let mut line = Vec::new();
+    quote(exe.as_os_str(), &mut line);
+    for a in args {
+        line.push(b' ' as u16);
+        quote(a, &mut line);
+    }
+    line.push(0);
+
+    let app = wide(exe.as_os_str());
+    let dir = wide(cwd.as_os_str());
+
+    let mut si: STARTUPINFOW = unsafe { mem::zeroed() };
+    si.cb = mem::size_of::<STARTUPINFOW>() as u32;
+    let mut pi: PROCESS_INFORMATION = unsafe { mem::zeroed() };
+
+    let ok = unsafe {
+        CreateProcessW(
+            app.as_ptr(),
+            line.as_mut_ptr(),
+            ptr::null(),
+            ptr::null(),
+            0, // bInheritHandles - darum geht es
+            DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW,
+            ptr::null(),
+            dir.as_ptr(),
+            &si,
+            &mut pi,
+        )
+    };
+    if ok == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    // Wir wollen nicht auf ihn warten, nur wissen, wer er ist.
+    unsafe {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+    Ok(pi.dwProcessId)
+}
+
+fn wide(s: &OsStr) -> Vec<u16> {
+    s.encode_wide().chain(std::iter::once(0)).collect()
+}
+
+/// Ein Argument so einpacken, wie die C-Laufzeit es wieder auseinandernimmt:
+/// Backslashes zaehlen nur vor einem Anfuehrungszeichen, dort verdoppelt.
+fn quote(arg: &OsStr, out: &mut Vec<u16>) {
+    const Q: u16 = b'"' as u16;
+    const BS: u16 = b'\\' as u16;
+    out.push(Q);
+    let mut slashes = 0;
+    for c in arg.encode_wide() {
+        if c == BS {
+            slashes += 1;
+        } else {
+            if c == Q {
+                for _ in 0..=slashes {
+                    out.push(BS);
+                }
+            }
+            slashes = 0;
+        }
+        out.push(c);
+    }
+    for _ in 0..slashes {
+        out.push(BS);
+    }
+    out.push(Q);
 }
 
 // --- Netz -----------------------------------------------------------------------
@@ -296,6 +381,27 @@ mod tests {
         let port = l.local_addr().unwrap().port();
         assert_eq!(port_owner(port), Some(std::process::id()));
         drop(l);
+    }
+
+    fn q(s: &str) -> String {
+        let mut out = Vec::new();
+        quote(OsStr::new(s), &mut out);
+        String::from_utf16(&out).unwrap()
+    }
+
+    /// So packt die C-Laufzeit es wieder aus. Vor allem der Pfad mit
+    /// Leerzeichen muss halten: `--root C:\Program Files\...` kam frueher
+    /// als drei Argumente an.
+    #[test]
+    fn argumente_einpacken() {
+        assert_eq!(q("start"), r#""start""#);
+        assert_eq!(q(r"C:\Program Files\tn"), r#""C:\Program Files\tn""#);
+        // Ein Backslash am Ende wuerde sonst das schliessende
+        // Anfuehrungszeichen schlucken.
+        assert_eq!(q(r"C:\netz\"), r#""C:\netz\\""#);
+        assert_eq!(q(r#"a"b"#), r#""a\"b""#);
+        assert_eq!(q(r#"a\"b"#), r#""a\\\"b""#);
+        assert_eq!(q(""), r#""""#);
     }
 
     #[test]

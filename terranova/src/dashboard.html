@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terranova</title>
+<style>
+  :root {
+    --bg: #14171c; --panel: #1b1f26; --line: #2a303a; --fg: #e6e9ef;
+    --dim: #8b93a3; --accent: #54c8ff; --ok: #58c878; --warn: #e0a33e;
+    --bad: #e05c5c; --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+    padding: 14px 20px; border-bottom: 1px solid var(--line);
+  }
+  h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  h1 span { color: var(--accent); }
+  .dim { color: var(--dim); }
+  main { padding: 20px; display: grid; gap: 20px; max-width: 1100px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  section > h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--dim); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 9px 16px; text-align: left; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  th { font-weight: 500; color: var(--dim); font-size: 12px; }
+  td.name { font-weight: 600; }
+  td.num, th.num { font-variant-numeric: tabular-nums; color: var(--dim); }
+  .badge {
+    display: inline-block; padding: 1px 8px; border-radius: 99px;
+    font-size: 12px; border: 1px solid currentColor;
+  }
+  .ready { color: var(--ok); } .stopped { color: var(--dim); }
+  .starting, .stopping { color: var(--warn); }
+  .crashloop, .conflict { color: var(--bad); }
+  .adopted { color: var(--warn); font-size: 12px; }
+  button {
+    background: #262c36; color: var(--fg); border: 1px solid var(--line);
+    border-radius: 5px; padding: 4px 10px; cursor: pointer; font-size: 13px;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .35; cursor: default; }
+  button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+  .actions { display: flex; gap: 6px; justify-content: flex-end; }
+  #console {
+    font: 12px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word;
+    height: 340px; overflow-y: auto; padding: 12px 16px; margin: 0;
+  }
+  #console .err { color: var(--bad); }
+  #console .sys { color: var(--accent); }
+  #console .gap { color: var(--warn); font-style: italic; }
+  .inputrow { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
+  .inputrow input {
+    flex: 1; background: #12151a; color: var(--fg); border: 1px solid var(--line);
+    border-radius: 5px; padding: 6px 10px; font: 13px var(--mono);
+  }
+  .inputrow input:focus { outline: none; border-color: var(--accent); }
+  .bar { display: flex; gap: 8px; align-items: center; padding: 12px 16px; flex-wrap: wrap; }
+  .bar input[type=number] { width: 56px; background: #12151a; color: var(--fg);
+    border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; }
+  #toast {
+    position: fixed; right: 20px; bottom: 20px; background: var(--panel);
+    border: 1px solid var(--bad); color: var(--bad); padding: 10px 14px;
+    border-radius: 6px; max-width: 420px; display: none;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Terranova<span id="rt"></span></h1>
+  <span class="dim" id="sub">verbinde…</span>
+  <span style="flex:1"></span>
+  <button id="netstart">Netzwerk starten</button>
+  <button id="netstop" class="danger">Netzwerk herunterfahren</button>
+</header>
+
+<main>
+  <section>
+    <h2>Server</h2>
+    <table>
+      <thead><tr>
+        <th>Name</th><th>Zustand</th><th class="num">Port</th><th class="num">PID</th>
+        <th class="num">Laufzeit</th><th></th>
+      </tr></thead>
+      <tbody id="nodes"></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Konsole <span class="dim" id="who"></span></h2>
+    <pre id="console"></pre>
+    <div class="inputrow">
+      <input id="cmd" placeholder="Befehl an den Server – Eingabetaste schickt ihn ab" autocomplete="off" disabled>
+      <button id="send" disabled>Senden</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Dungeons</h2>
+    <table><tbody id="mines"></tbody></table>
+    <div class="bar">
+      <button id="open">Öffnen</button>
+      <input type="number" id="count" value="1" min="1" max="99" title="wie viele">
+      <span class="dim" id="slots"></span>
+      <span style="flex:1"></span>
+      <button id="reap">Abgelaufene abräumen</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let selected = null, stream = null, ready = false;
+
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 6000);
+}
+
+async function api(path, method = "GET", body) {
+  const r = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await r.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { /* kein JSON */ }
+  if (!r.ok) throw new Error(data.error || `Fehler ${r.status}`);
+  return data;
+}
+
+function secs(s) {
+  if (s == null) return "–";
+  if (s < 90) return s + "s";
+  if (s < 5400) return Math.round(s / 60) + "m";
+  return Math.floor(s / 3600) + "h" + String(Math.floor((s % 3600) / 60)).padStart(2, "0") + "m";
+}
+
+// Die Zeilen werden fortgeschrieben, nicht neu gebaut. Wer eine Tabelle
+// alle zwei Sekunden neu aufbaut, zieht dem Benutzer die Schaltflaeche unter
+// dem Zeiger weg.
+const rows = new Map();
+
+function button(label, fn, danger) {
+  const b = document.createElement("button");
+  b.textContent = label;
+  if (danger) b.className = "danger";
+  b.onclick = async () => {
+    b.disabled = true;
+    try { await fn(); } catch (e) { toast(e.message); }
+    b.disabled = false;
+    refresh();
+  };
+  return b;
+}
+
+function nodeRow(n) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td class="name"></td><td></td><td class="num"></td>
+                  <td class="num"></td><td class="num"></td>`;
+  const td = document.createElement("td");
+  td.className = "actions";
+  const konsole = button("Konsole", async () => watch(n.name));
+  const toggle = button("Stopp", () => api(`/api/nodes/${n.name}/${toggle._stop ? "stop" : "start"}`, "POST"), true);
+  const neu = button("Neustart", () => api(`/api/nodes/${n.name}/restart`, "POST"));
+  td.append(konsole, toggle, neu);
+  tr.append(td);
+  const cells = tr.querySelectorAll("td");
+  return { tr, toggle, name: cells[0], state: cells[1], port: cells[2], pid: cells[3], up: cells[4] };
+}
+
+function fillNode(r, n) {
+  r.name.textContent = n.name;
+  r.state.innerHTML = `<span class="badge ${n.status}">${n.status}</span>` +
+    (n.control === "adopted"
+      ? ' <span class="adopted" title="lief schon – Befehle gehen über RCON">übernommen</span>'
+      : "");
+  r.port.textContent = n.port;
+  r.pid.textContent = n.pid ?? "–";
+  r.up.textContent = secs(n.uptime_s);
+  const running = n.status !== "stopped";
+  r.toggle._stop = running;
+  r.toggle.textContent = running ? "Stopp" : "Start";
+  r.toggle.className = running ? "danger" : "";
+}
+
+function line(text, kind) {
+  const el = $("#console");
+  const near = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  const span = document.createElement("span");
+  span.className = kind || "";
+  span.textContent = text + "\n";
+  el.append(span);
+  while (el.childNodes.length > 3000) el.removeChild(el.firstChild);
+  if (near) el.scrollTop = el.scrollHeight;
+}
+
+function watch(name) {
+  if (stream) { stream.close(); stream = null; }
+  selected = name;
+  $("#console").textContent = "";
+  $("#who").textContent = "– " + name;
+  $("#cmd").disabled = false; $("#send").disabled = false;
+  stream = new EventSource(`/api/nodes/${name}/console`);
+  for (const kind of ["out", "err", "sys", "gap"]) {
+    stream.addEventListener(kind, e => line(e.data, kind));
+  }
+  stream.onerror = () => line("[Verbindung unterbrochen – wird erneut versucht]", "gap");
+}
+
+async function send() {
+  const input = $("#cmd");
+  const text = input.value.trim();
+  if (!text || !selected) return;
+  input.value = "";
+  try {
+    const r = await api(`/api/nodes/${selected}/command`, "POST", { line: text });
+    if (r.reply && r.reply.trim()) line(r.reply.trimEnd(), "sys");
+  } catch (e) { toast(e.message); }
+}
+
+async function refresh() {
+  try {
+    const s = await api("/api/status");
+    ready = true;
+    $("#rt").textContent = " · " + s.runtime;
+    const up = s.nodes.filter(n => n.status === "ready").length;
+    $("#sub").textContent = s.shutting_down
+      ? "fährt herunter…" : `${up} von ${s.nodes.length} bereit`;
+    const body = $("#nodes");
+    const seen = new Set();
+    for (const n of s.nodes) {
+      seen.add(n.name);
+      let r = rows.get(n.name);
+      if (!r) { r = nodeRow(n); rows.set(n.name, r); body.append(r.tr); }
+      fillNode(r, n);
+    }
+    for (const [name, r] of rows) {
+      if (!seen.has(name)) { r.tr.remove(); rows.delete(name); }
+    }
+
+    const m = await api("/api/mines");
+    $("#slots").textContent = `${m.mines.length} von ${m.slots} Plätzen belegt`;
+    const mb = $("#mines");
+    // Die Dungeon-Liste ist kurz und aendert sich selten - hier genuegt neu
+    // zeichnen, solange gerade keine Schaltflaeche gedrueckt wird.
+    if (document.activeElement?.tagName !== "BUTTON" || !mb.contains(document.activeElement)) {
+      mb.textContent = "";
+      if (!m.mines.length) {
+        mb.innerHTML = `<tr><td class="dim">Kein Dungeon offen.</td></tr>`;
+      }
+      for (const mine of m.mines) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td class="name">${mine.name}</td>
+          <td><span class="badge ${mine.status}">${mine.status}</span></td>
+          <td class="num">Port ${mine.port}</td>
+          <td class="num">noch ${secs(mine.expires_in_s)}</td>`;
+        const td = document.createElement("td");
+        td.className = "actions";
+        const slot = mine.name.split("-")[1];
+        td.append(button("Schließen", () => api(`/api/mines/${slot}/close`, "POST"), true));
+        tr.append(td); mb.append(tr);
+      }
+    }
+  } catch (e) {
+    if (ready) $("#sub").textContent = "kein Supervisor erreichbar";
+    else $("#sub").textContent = e.message;
+  }
+}
+
+$("#send").onclick = send;
+$("#cmd").addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+$("#netstart").onclick = async () => {
+  try { await api("/api/network/start", "POST"); } catch (e) { toast(e.message); }
+};
+$("#netstop").onclick = async () => {
+  if (!confirm("Das ganze Netzwerk herunterfahren?")) return;
+  try { await api("/api/network/stop", "POST"); } catch (e) { toast(e.message); }
+};
+$("#open").onclick = async () => {
+  try { await api("/api/mines/open", "POST", { count: +$("#count").value || 1 }); }
+  catch (e) { toast(e.message); }
+  refresh();
+};
+$("#reap").onclick = async () => {
+  try {
+    const r = await api("/api/mines/reap", "POST", { dry_run: false, stop_running: false });
+    toast((r.reaped || []).join("  ·  ") || "nichts zu tun");
+  } catch (e) { toast(e.message); }
+  refresh();
+};
+
+// Der Anmeldecode steht einmalig in der Adresszeile. Gegen ihn gibt es ein
+// Sitzungsplaetzchen - danach verschwindet er aus der Adresse, damit er nicht
+// im Verlauf stehen bleibt.
+(async function start() {
+  const code = new URLSearchParams(location.search).get("code");
+  if (code) {
+    try { await api("/api/session", "POST", { code }); } catch (e) { toast(e.message); }
+    history.replaceState(null, "", location.pathname);
+  }
+  refresh();
+  setInterval(refresh, 2000);
+})();
+</script>
+</body>
+</html>

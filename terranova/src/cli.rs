@@ -36,6 +36,9 @@ Dungeons
   mine list             was offen ist
   mine reap             abgelaufene abraeumen (--dry-run zeigt nur)
 
+Oberflaeche
+  dashboard             im Browser oeffnen
+
 Wartung
   sync [name...]        Server aus templates/ bestuecken
   doctor                pruefen, ob alles startklar ist
@@ -135,6 +138,7 @@ pub fn run() -> ExitCode {
         "logs" => logs(&paths, &cfg, &args.values, args.lines.unwrap_or(200)),
         "cmd" => cmd(&paths, &cfg, &args.values),
         "mine" => mine(&paths, &cfg, &args),
+        "dashboard" => dashboard(&paths, &cfg),
         "sync" => sync_cmd(&paths, &cfg, &args.values, args.dry_run),
         "doctor" => {
             let checks = doctor::run(&paths, &cfg);
@@ -673,6 +677,30 @@ fn mine(paths: &Paths, cfg: &Config, args: &Args) -> ExitCode {
             ExitCode::from(2)
         }
     }
+}
+
+/// Oeffnet das Dashboard im Browser.
+///
+/// Der Anmeldecode geht einmalig ueber die Adresszeile; die Seite tauscht
+/// ihn sofort gegen ein Sitzungsplaetzchen. Das Token selbst steht damit nie
+/// im Verlauf des Browsers.
+fn dashboard(paths: &Paths, cfg: &Config) -> ExitCode {
+    let c = match need_supervisor(paths, cfg) {
+        Ok(c) => c,
+        Err(e) => return e,
+    };
+    let code = match c.post("/api/login-code", json!({})) {
+        Ok((200, body)) => serde_json::from_str::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|v| v["code"].as_str().map(String::from))
+            .unwrap_or_default(),
+        other => return report(other, ""),
+    };
+    let url = format!("http://127.0.0.1:{}/?code={code}", c.port);
+    println!("[terranova] {url}");
+    // explorer.exe nimmt eine Adresse und oeffnet den eingestellten Browser.
+    let _ = std::process::Command::new("explorer.exe").arg(&url).spawn();
+    ExitCode::SUCCESS
 }
 
 // --- Wartung ------------------------------------------------------------------------

@@ -38,6 +38,10 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Was `terranova init` hinlegt - dieselbe Datei, die im Repository liegt.
 pub const DEFAULT_CONFIG: &str = include_str!("../../terranova.yml");
 
+/// Das Dashboard steckt in der Programmdatei: keine zweite Auslieferung,
+/// kein Bauschritt, nichts was auseinanderlaufen kann.
+pub const DASHBOARD: &str = include_str!("dashboard.html");
+
 fn main() -> ExitCode {
     cli::run()
 }

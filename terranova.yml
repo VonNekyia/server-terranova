@@ -1,0 +1,95 @@
+# ---------------------------------------------------------------------------
+# Das Terranova-Netzwerk: was laeuft, mit wie viel Speicher, auf welchem Port.
+#
+# Gelesen von bin/terranova.exe. Nach einer Aenderung zeigt
+# "terranova doctor", ob alles zusammenpasst.
+# ---------------------------------------------------------------------------
+
+# auto | native | docker
+# auto heisst unter Windows native. Docker wird nie gewaehlt, nur weil es
+# installiert ist - wer native Prozesse erwartet, soll nicht ploetzlich
+# Container bekommen.
+runtime: auto
+
+java:
+  # native: welches java. Die Umgebungsvariable TERRANOVA_JAVA uebersteuert.
+  path: java
+  # docker: welches Image
+  image: "eclipse-temurin:25-jre"
+  # aikar = die Aikar-Flags wie bisher in network.ps1, none = nur -Xms/-Xmx
+  flags: aikar
+
+deps:
+  mariadb:
+    version: "11.4.5"
+    port: 13306
+    # aus archive.mariadb.org/mariadb-11.4.5/winx64-packages/sha256sums.txt
+    sha256: b7c11d38657f16b837e68199d73670510aadb78f42dfa5d5fdea31a7aab342e3
+    image: "mariadb:11.4.5"
+    user: minecraft
+    password: minecraft
+    # Wer ein Plugin mit eigener Datenbank ergaenzt, traegt sie hier ein -
+    # sonst startet es mit "Unknown database". Der Name muss zu dem passen,
+    # was das Plugin in seiner Config erwartet:
+    #   nations          Nations/config.yml -> name   (auch PlayerActionAdapter)
+    #   betonquest       BetonQuest/config.yml -> base
+    #   chatcontrol      ChatControl/database.yml -> Database
+    #   interactivechat  InteractiveChat/storage.yml -> Database
+    #   luckperms        LuckPerms/config.yml -> database
+    #   proficisci       Proficisci/config.yml -> database
+    #   bountyfulseas    BountyfulSeas/config.yml -> name
+    #   husksync         HuskSync/config.yml -> database.credentials.database
+    databases: [nations, betonquest, chatcontrol, interactivechat, luckperms, proficisci, bountyfulseas, husksync]
+
+  redis:
+    port: 6379
+    # HuskSync braucht Redis. Offiziell gibt es Redis fuer Windows nicht;
+    # verwendet wird der native Port von zkteco-home, festgenagelt auf den
+    # Commit von 8.10.1 - lose Dateien am Zweigende sind kein stabiles Artefakt.
+    windows_commit: 794a883a083a317bc23fbbabc83a3c54abab0799
+    sha256:
+      redis-server.exe: 1372626b3ecbcf654823e52c7235d052dab0a93ec10da9847c3fda0f388d155e
+      redis-cli.exe: febc307dfece765e2710c87b3aeda340a240f636a68cb7e8b317c4f3214a8188
+    image: "redis:8.8.2"
+
+proxy:
+  dir: proxy
+  port: 25565
+  memory: 512M
+
+# Vorlage je Server: templates/<name>, Verzeichnis: servers/<name>
+servers:
+  main:  { port: 25566, memory: 4G, stop_timeout: 180s }
+  build: { port: 25567, memory: 2G }
+  farm:  { port: 25568, memory: 2G }
+
+# RCON je Server auf Port + 100, nur auf 127.0.0.1
+rcon_offset: 100
+
+mines:
+  template: mining
+  # muss zu mining-1 .. mining-8 in proxy/velocity.toml passen
+  slots: 8
+  # mining-N laeuft auf 25570 + N
+  base_port: 25570
+  memory: 2G
+  lifetime: 24h
+  motd: "Terranova Mine {n}"
+  # Offene Dungeons nach einem Neustart des Netzwerks wieder hochfahren
+  resume: true
+
+schedule:
+  daily_restart:
+    at: "04:00"
+    servers: [main, build, farm]
+    # nacheinander, damit nie alle gleichzeitig unten sind
+    gap: 120s
+    warn: 30s
+    message: "Neustart in 30 Sekunden."
+  reap_every: 15m
+
+dashboard:
+  port: 25590
+  # stop = Schliessen des Startfensters faehrt das Netzwerk sauber herunter
+  # detach = das Netzwerk laeuft ohne Fenster weiter
+  on_window_close: stop

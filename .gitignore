@@ -19,6 +19,9 @@ out/
 # wiederherstellen kann, wird nicht committet.
 # ---------------------------------------------------------------------------
 
+# Rust-Baustelle
+terranova/target/
+
 # Von start.bat heruntergeladen und angelegt: MariaDB und Redis samt Daten
 runtime/
 

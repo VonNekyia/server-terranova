@@ -373,9 +373,23 @@ impl<'de> Deserialize<'de> for Dur {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum NodeKind {
+    /// Wird zuerst gestartet und zuerst gestoppt
+    MariaDb,
+    Redis,
     Proxy,
     Server,
     Mine(u8),
+}
+
+impl NodeKind {
+    /// Haelt der Knoten eine Welt, die beim Stoppen gespeichert werden muss?
+    pub fn is_minecraft(self) -> bool {
+        matches!(self, NodeKind::Proxy | NodeKind::Server | NodeKind::Mine(_))
+    }
+
+    pub fn is_dependency(self) -> bool {
+        matches!(self, NodeKind::MariaDb | NodeKind::Redis)
+    }
 }
 
 /// Alles, was es braucht, um einen Proxy oder Server zu starten.

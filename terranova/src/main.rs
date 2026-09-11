@@ -9,16 +9,24 @@
 
 use std::process::ExitCode;
 
+mod api;
+mod backend;
 mod cli;
+mod client;
 mod config;
 mod console;
+mod deps;
 mod doctor;
+mod http;
 mod mines;
 mod paperyml;
 mod paths;
 mod props;
 mod rcon;
+mod reaper;
+mod sched;
 mod secrets;
+mod supervisor;
 mod sync;
 mod win;
 

@@ -31,6 +31,8 @@ servers/*/plugins/*.jar
 servers/*/plugins/PlaceholderAPI/expansions/
 servers/*/config/
 servers/*/server.properties
+# Liste dessen, was terranova sync hierher kopiert hat
+servers/*/.terranova-sync.json
 servers/*/eula.txt
 servers/*/bukkit.yml
 servers/*/spigot.yml

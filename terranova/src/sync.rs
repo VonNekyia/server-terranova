@@ -47,7 +47,6 @@ impl Report {
 
 pub struct Syncer<'a> {
     paths: &'a Paths,
-    cfg: &'a Config,
     forwarding_secret: String,
     rcon_password: String,
 }
@@ -60,7 +59,6 @@ impl<'a> Syncer<'a> {
         let (rcon_password, _) = secrets::load_or_create(&paths.rcon_secret())?;
         Ok(Syncer {
             paths,
-            cfg,
             forwarding_secret,
             rcon_password,
         })
@@ -115,7 +113,10 @@ impl<'a> Syncer<'a> {
             copy_into(&src, dir, &rel, dry_run, &mut r)?;
             managed.insert(rel);
         }
-        let expansions = common.join("plugins").join("PlaceholderAPI").join("expansions");
+        let expansions = common
+            .join("plugins")
+            .join("PlaceholderAPI")
+            .join("expansions");
         for src in jars_matching(&expansions, "") {
             let rel = format!("plugins/PlaceholderAPI/expansions/{}", file_name(&src));
             copy_into(&src, dir, &rel, dry_run, &mut r)?;
@@ -189,7 +190,10 @@ impl<'a> Syncer<'a> {
             let m = Manifest {
                 files: managed.into_iter().collect(),
             };
-            fs::write(&manifest_path, serde_json::to_vec_pretty(&m).expect("Manifest"))?;
+            fs::write(
+                &manifest_path,
+                serde_json::to_vec_pretty(&m).expect("Manifest"),
+            )?;
         }
 
         Ok(r)
@@ -197,7 +201,10 @@ impl<'a> Syncer<'a> {
 }
 
 fn file_name(p: &Path) -> String {
-    p.file_name().unwrap_or_default().to_string_lossy().into_owned()
+    p.file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// Jars in einem Verzeichnis, deren Name mit `prefix` beginnt. Sortiert,
@@ -286,7 +293,13 @@ mod tests {
         let root = tempdir(tag);
         let common = root.join("templates").join("common");
         fs::create_dir_all(common.join("config")).unwrap();
-        fs::create_dir_all(common.join("plugins").join("PlaceholderAPI").join("expansions")).unwrap();
+        fs::create_dir_all(
+            common
+                .join("plugins")
+                .join("PlaceholderAPI")
+                .join("expansions"),
+        )
+        .unwrap();
         fs::create_dir_all(common.join("plugins").join("HuskSync")).unwrap();
         fs::write(common.join("paper-26.2-123.jar"), b"paper").unwrap();
         fs::write(common.join("eula.txt"), "eula=true\n").unwrap();
@@ -297,11 +310,23 @@ mod tests {
             "proxies:\n  velocity:\n    enabled: false\n    online-mode: true\n    secret: ''\n",
         )
         .unwrap();
-        fs::write(common.join("server.properties"), "motd=A Minecraft Server\nserver-port=25565\n").unwrap();
-        fs::write(common.join("plugins").join("LuckPerms-5.5.81.jar"), b"lp").unwrap();
-        fs::write(common.join("plugins").join("HuskSync").join("config.yml"), "husksync: 1\n").unwrap();
         fs::write(
-            common.join("plugins").join("PlaceholderAPI").join("expansions").join("Expansion-player.jar"),
+            common.join("server.properties"),
+            "motd=A Minecraft Server\nserver-port=25565\n",
+        )
+        .unwrap();
+        fs::write(common.join("plugins").join("LuckPerms-5.5.81.jar"), b"lp").unwrap();
+        fs::write(
+            common.join("plugins").join("HuskSync").join("config.yml"),
+            "husksync: 1\n",
+        )
+        .unwrap();
+        fs::write(
+            common
+                .join("plugins")
+                .join("PlaceholderAPI")
+                .join("expansions")
+                .join("Expansion-player.jar"),
             b"exp",
         )
         .unwrap();
@@ -312,7 +337,11 @@ mod tests {
 
         let mine = root.join("templates").join("mining");
         fs::create_dir_all(mine.join("plugins")).unwrap();
-        fs::write(mine.join("plugins").join("BountyfulMining-1.0.0.jar"), b"bm").unwrap();
+        fs::write(
+            mine.join("plugins").join("BountyfulMining-1.0.0.jar"),
+            b"bm",
+        )
+        .unwrap();
 
         let cfg = Config::parse(crate::testutil::EXAMPLE_CONFIG).unwrap();
         let paths = Paths::new(&root);
@@ -340,7 +369,8 @@ mod tests {
             "server.properties",
         ] {
             assert!(
-                dir.join(f.replace('/', std::path::MAIN_SEPARATOR_STR)).is_file(),
+                dir.join(f.replace('/', std::path::MAIN_SEPARATOR_STR))
+                    .is_file(),
                 "{f} fehlt"
             );
         }
@@ -394,11 +424,19 @@ mod tests {
         let dir = root.join("servers").join("main");
         fs::write(dir.join("plugins").join("VonHand.jar"), b"x").unwrap();
         fs::create_dir_all(dir.join("plugins").join("Nations")).unwrap();
-        fs::write(dir.join("plugins").join("Nations").join("config.yml"), "x: 1\n").unwrap();
+        fs::write(
+            dir.join("plugins").join("Nations").join("config.yml"),
+            "x: 1\n",
+        )
+        .unwrap();
 
         s.sync(&main, false).unwrap();
         assert!(dir.join("plugins").join("VonHand.jar").is_file());
-        assert!(dir.join("plugins").join("Nations").join("config.yml").is_file());
+        assert!(dir
+            .join("plugins")
+            .join("Nations")
+            .join("config.yml")
+            .is_file());
     }
 
     #[test]
@@ -407,7 +445,12 @@ mod tests {
         let s = Syncer::new(&paths, &cfg).unwrap();
         let main = cfg.node(&paths, "main").unwrap();
         s.sync(&main, false).unwrap();
-        let hs = root.join("servers").join("main").join("plugins").join("HuskSync").join("config.yml");
+        let hs = root
+            .join("servers")
+            .join("main")
+            .join("plugins")
+            .join("HuskSync")
+            .join("config.yml");
         fs::write(&hs, "von hand angepasst\n").unwrap();
         s.sync(&main, false).unwrap();
         assert_eq!(fs::read_to_string(&hs).unwrap(), "von hand angepasst\n");
@@ -423,7 +466,10 @@ mod tests {
         let p = fs::read_to_string(dir.join("server.properties")).unwrap();
         assert!(p.contains("motd=Terranova Mine 3"), "{p}");
         assert!(p.contains("server-port=25573") && p.contains("rcon.port=25673"));
-        assert!(dir.join("plugins").join("BountyfulMining-1.0.0.jar").is_file());
+        assert!(dir
+            .join("plugins")
+            .join("BountyfulMining-1.0.0.jar")
+            .is_file());
         // Nations gehoert main, nicht dem Dungeon
         assert!(!dir.join("plugins").join("Nations-1.0.0.jar").exists());
     }

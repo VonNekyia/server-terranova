@@ -161,7 +161,8 @@ mod tests {
                     continue;
                 }
                 let cmd = read_packet(&mut s).unwrap();
-                s.write_all(&encode(cmd.id, 0, &format!("ok:{}", cmd.body))).unwrap();
+                s.write_all(&encode(cmd.id, 0, &format!("ok:{}", cmd.body)))
+                    .unwrap();
             }
         });
         port

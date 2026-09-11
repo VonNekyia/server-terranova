@@ -38,7 +38,10 @@ pub fn now_unix() -> u64 {
 
 pub fn write_marker(dir: &Path, slot: u8, opened_at: u64) -> io::Result<()> {
     let m = Marker { slot, opened_at };
-    fs::write(dir.join(MARKER), serde_json::to_vec_pretty(&m).expect("Marker"))
+    fs::write(
+        dir.join(MARKER),
+        serde_json::to_vec_pretty(&m).expect("Marker"),
+    )
 }
 
 /// Wann wurde der Dungeon geoeffnet?
@@ -183,7 +186,9 @@ mod tests {
     fn ausdruecklicher_platz_stoppt_am_ersten_laufenden() {
         let running = |n: u8| n == 7;
         assert_eq!(pick_slots(3, Some(5), 8, running), Ok(vec![5, 6]));
-        assert!(pick_slots(1, Some(7), 8, running).unwrap_err().contains("laeuft bereits"));
+        assert!(pick_slots(1, Some(7), 8, running)
+            .unwrap_err()
+            .contains("laeuft bereits"));
         assert!(pick_slots(1, Some(9), 8, running).is_err());
     }
 
@@ -209,12 +214,27 @@ mod tests {
             }
         );
         // genau 24 h: abgelaufen
-        assert_eq!(reap_decision(Some(old), now, DAY, false, false), Reap::Delete);
-        assert_eq!(reap_decision(Some(old), now, DAY, true, false), Reap::SkipRunning);
-        assert_eq!(reap_decision(Some(old), now, DAY, true, true), Reap::StopThenDelete);
+        assert_eq!(
+            reap_decision(Some(old), now, DAY, false, false),
+            Reap::Delete
+        );
+        assert_eq!(
+            reap_decision(Some(old), now, DAY, true, false),
+            Reap::SkipRunning
+        );
+        assert_eq!(
+            reap_decision(Some(old), now, DAY, true, true),
+            Reap::StopThenDelete
+        );
         // Zukunft zaehlt als frisch, Unbekanntes wird behalten
-        assert!(matches!(reap_decision(Some(now + 99), now, DAY, false, false), Reap::Keep { .. }));
-        assert!(matches!(reap_decision(None, now, DAY, false, false), Reap::Keep { .. }));
+        assert!(matches!(
+            reap_decision(Some(now + 99), now, DAY, false, false),
+            Reap::Keep { .. }
+        ));
+        assert!(matches!(
+            reap_decision(None, now, DAY, false, false),
+            Reap::Keep { .. }
+        ));
     }
 
     #[test]

@@ -1,0 +1,58 @@
+# Baut und prueft die CLI. Nur Windows - das Netzwerk laeuft dort, und die
+# Prozessverwaltung ist Windows-eigen (versteckte Fenster, Uebernahme ueber
+# PID und Port). Der Docker-Rueckhalt haengt an Docker Desktop und laesst
+# sich hier nicht sinnvoll pruefen.
+name: terranova
+
+on:
+  push:
+    paths:
+      - "terranova/**"
+      - "terranova.yml"
+      - "proxy/velocity.toml"
+      - ".github/workflows/terranova.yml"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pruefen:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: terranova
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust einrichten
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          rustup component add rustfmt clippy
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            terranova/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('terranova/Cargo.lock') }}
+
+      - name: Formatierung
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Die Tests lesen terranova.yml und proxy/velocity.toml aus dem
+      # Repository: passen die Dungeon-Plaetze nicht mehr zusammen, faellt
+      # es hier auf und nicht erst beim Starten.
+      - name: Tests
+        run: cargo test
+
+      - name: Release bauen
+        run: cargo build --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terranova-windows-x64
+          path: terranova/target/release/terranova.exe

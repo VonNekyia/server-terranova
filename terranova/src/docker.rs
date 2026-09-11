@@ -12,7 +12,6 @@
 //! Neustart des Supervisors waere die Konsole fuer immer tot.
 
 use std::io;
-use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
@@ -29,7 +28,6 @@ use crate::win;
 pub struct Docker {
     project: String,
     cfg: Config,
-    root: std::path::PathBuf,
 }
 
 fn docker() -> Command {
@@ -70,7 +68,6 @@ impl Docker {
         Docker {
             project,
             cfg: cfg.clone(),
-            root: paths.root.clone(),
         }
     }
 
@@ -92,9 +89,21 @@ impl Docker {
         let _ = run(&["rm", "-f", &probe]);
         let port = "25599";
         let started = run(&[
-            "run", "-d", "--rm", "--name", &probe, "--network", "host",
+            "run",
+            "-d",
+            "--rm",
+            "--name",
+            &probe,
+            "--network",
+            "host",
             &self.cfg.deps.redis.image,
-            "redis-server", "--port", port, "--bind", "127.0.0.1", "--save", "",
+            "redis-server",
+            "--port",
+            port,
+            "--bind",
+            "127.0.0.1",
+            "--save",
+            "",
         ]);
         let result = match started {
             Err(e) => Err(format!("Probelauf laesst sich nicht starten: {e}")),
@@ -177,9 +186,18 @@ impl Docker {
             _ => {
                 let jar = crate::backend::find_jar(
                     &node.dir,
-                    if node.is_proxy() { "velocity" } else { "paper-" },
+                    if node.is_proxy() {
+                        "velocity"
+                    } else {
+                        "paper-"
+                    },
                 )
-                .map(|p| p.file_name().unwrap_or_default().to_string_lossy().into_owned())
+                .map(|p| {
+                    p.file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .into_owned()
+                })
                 .unwrap_or_default();
                 a.extend([
                     "-v".into(),
@@ -221,10 +239,6 @@ impl SpecName for NodeSpec {
 }
 
 impl Backend for Docker {
-    fn name(&self) -> &'static str {
-        "docker"
-    }
-
     fn spawn(&self, node: &NodeSpec) -> io::Result<Child> {
         let name = self.container(&node.name);
         match self.state_of(&name).as_deref() {
@@ -333,16 +347,6 @@ pub fn mem_total_mb() -> Option<u64> {
         .map(|b| b / 1024 / 1024)
 }
 
-pub fn available() -> bool {
-    run(&["version", "--format", "{{.Client.Version}}"]).is_ok()
-}
-
-/// Ob das Verzeichnis ueberhaupt eingehaengt werden kann - unter Windows
-/// muss das Laufwerk in Docker Desktop freigegeben sein.
-pub fn can_mount(dir: &Path) -> bool {
-    dir.is_dir()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,7 +389,9 @@ mod tests {
     fn der_proxy_bekommt_kein_nogui() {
         let d = fixture();
         let cfg = Config::parse(EXAMPLE_CONFIG).unwrap();
-        let node = cfg.node(&Paths::new("C:\\net\\terranova"), "proxy").unwrap();
+        let node = cfg
+            .node(&Paths::new("C:\\net\\terranova"), "proxy")
+            .unwrap();
         let a = d.run_args(&node);
         assert!(!a.contains(&"--nogui".to_string()));
         // Aikar-Flags sind fuer Paper, nicht fuer Velocity

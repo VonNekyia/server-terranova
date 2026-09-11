@@ -159,4 +159,3 @@ scoreboards:
         assert_eq!(inject(text, "S"), text);
     }
 }
-

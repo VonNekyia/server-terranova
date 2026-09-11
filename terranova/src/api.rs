@@ -20,7 +20,7 @@ use serde_json::json;
 use crate::config::NodeKind;
 use crate::console::Batch;
 use crate::http::{self, Reply, Request, Response};
-use crate::supervisor::{Node, Status, Supervisor};
+use crate::supervisor::{Status, Supervisor};
 use crate::{mines, secrets};
 
 /// Wie lange auf neue Konsolenzeilen gewartet wird, bevor ein Lebenszeichen
@@ -338,7 +338,10 @@ impl Api {
 
     fn reap(&self, req: &Request) -> Reply {
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let dry = body.get("dry_run").and_then(|v| v.as_bool()).unwrap_or(false);
+        let dry = body
+            .get("dry_run")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let stop_running = body
             .get("stop_running")
             .and_then(|v| v.as_bool())
@@ -365,6 +368,13 @@ impl Api {
                     b.next
                 }
             };
+            // Wer mit einer Marke wiederkommt, will seine verpassten Zeilen
+            // sofort und nicht erst beim naechsten Lebenszeichen.
+            if since.is_some() {
+                let b = ring.since(next);
+                write_batch(w, &b)?;
+                next = b.next;
+            }
             loop {
                 let b = ring.wait_since(next, SSE_TICK);
                 if b.lines.is_empty() && b.gap.is_none() {
@@ -398,33 +408,4 @@ fn lines_json(b: &Batch) -> Vec<serde_json::Value> {
         .iter()
         .map(|l| json!({ "seq": l.seq, "kind": l.kind, "text": l.text }))
         .collect()
-}
-
-/// Was `Node` fuer die Anzeige hergibt - hier gebuendelt, damit die CLI
-/// dieselben Felder benutzt wie das Dashboard.
-pub fn node_line(n: &Node) -> String {
-    let status = format!("{:?}", n.status()).to_lowercase();
-    let pid = n.pid().map_or_else(|| "-".to_string(), |p| p.to_string());
-    let up = n.uptime().map_or_else(
-        || "-".to_string(),
-        |d| {
-            let s = d.as_secs();
-            if s < 90 {
-                format!("{s}s")
-            } else if s < 5400 {
-                format!("{}m", s / 60)
-            } else {
-                format!("{}h{}m", s / 3600, (s % 3600) / 60)
-            }
-        },
-    );
-    let ctrl = if n.control() == crate::supervisor::Control::Adopted {
-        " (uebernommen)"
-    } else {
-        ""
-    };
-    format!(
-        "{:<10} {:<10} Port {:<6} PID {:<8} {:>6}{}",
-        n.spec.name, status, n.spec.port, pid, up, ctrl
-    )
 }

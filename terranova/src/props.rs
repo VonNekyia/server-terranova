@@ -38,7 +38,11 @@ pub fn wants(
 }
 
 pub fn render(template: &str, want: &[(String, String)]) -> String {
-    let eol = if template.contains("\r\n") { "\r\n" } else { "\n" };
+    let eol = if template.contains("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
     let mut lines: Vec<String> = template.lines().map(String::from).collect();
     let mut seen = vec![false; want.len()];
 

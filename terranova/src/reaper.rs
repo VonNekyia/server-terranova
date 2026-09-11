@@ -105,13 +105,25 @@ mod tests {
         let cfg = Config::parse(crate::testutil::EXAMPLE_CONFIG).unwrap();
         // frisch geoeffnet -> behalten
         assert!(matches!(
-            mines::reap_decision(Some(mines::now_unix()), mines::now_unix(), cfg.mines.lifetime.0, true, false),
+            mines::reap_decision(
+                Some(mines::now_unix()),
+                mines::now_unix(),
+                cfg.mines.lifetime.0,
+                true,
+                false
+            ),
             Reap::Keep { .. }
         ));
         // abgelaufen und laeuft -> nur mit stop_running
         let old = mines::now_unix() - 25 * 3600;
         assert_eq!(
-            mines::reap_decision(Some(old), mines::now_unix(), Duration::from_secs(24 * 3600), true, false),
+            mines::reap_decision(
+                Some(old),
+                mines::now_unix(),
+                Duration::from_secs(24 * 3600),
+                true,
+                false
+            ),
             Reap::SkipRunning
         );
     }

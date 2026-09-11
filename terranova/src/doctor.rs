@@ -2,7 +2,6 @@
 
 use std::fmt::Write as _;
 use std::fs;
-use std::path::Path;
 use std::process::{Command, Stdio};
 
 use crate::config::{Config, Runtime};
@@ -65,7 +64,11 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
     // --- Vorlagen ------------------------------------------------------------
     let common = paths.common();
     if !common.is_dir() {
-        add(Level::Fail, "Vorlagen", format!("{} fehlt", common.display()));
+        add(
+            Level::Fail,
+            "Vorlagen",
+            format!("{} fehlt", common.display()),
+        );
     } else {
         let paper = fs::read_dir(&common)
             .into_iter()
@@ -83,14 +86,19 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
         }
         for f in ["server.properties", "eula.txt"] {
             if !common.join(f).is_file() {
-                add(Level::Warn, "Vorlagen", format!("templates/common/{f} fehlt"));
+                add(
+                    Level::Warn,
+                    "Vorlagen",
+                    format!("templates/common/{f} fehlt"),
+                );
             }
         }
         if !common.join("config").join("paper-global.yml").is_file() {
             add(
                 Level::Warn,
                 "Vorlagen",
-                "templates/common/config/paper-global.yml fehlt - ohne sie keine Weiterleitung".into(),
+                "templates/common/config/paper-global.yml fehlt - ohne sie keine Weiterleitung"
+                    .into(),
             );
         }
     }
@@ -108,7 +116,10 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
         add(
             Level::Fail,
             "Vorlagen",
-            format!("templates/{}/ fehlt - ohne sie kein Dungeon", cfg.mines.template),
+            format!(
+                "templates/{}/ fehlt - ohne sie kein Dungeon",
+                cfg.mines.template
+            ),
         );
     }
 
@@ -131,7 +142,11 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
 
     let vtoml = proxy_dir.join("velocity.toml");
     match fs::read_to_string(&vtoml) {
-        Err(e) => add(Level::Fail, "velocity.toml", format!("{}: {e}", vtoml.display())),
+        Err(e) => add(
+            Level::Fail,
+            "velocity.toml",
+            format!("{}: {e}", vtoml.display()),
+        ),
         Ok(text) => {
             let v = parse_velocity(&text);
             match v.forwarding.as_deref() {
@@ -188,7 +203,9 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
             add(
                 Level::Warn,
                 "Weiterleitung",
-                format!("{name}: kein Secret in config/paper-global.yml - 'terranova sync' setzt es"),
+                format!(
+                    "{name}: kein Secret in config/paper-global.yml - 'terranova sync' setzt es"
+                ),
             );
         }
     }
@@ -218,7 +235,8 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
             Err(e) => add(Level::Fail, "Docker", e),
         }
         if let Some(mb) = crate::docker::mem_total_mb() {
-            let base: u32 = cfg.proxy.memory.0 + cfg.servers.values().map(|s| s.memory.0).sum::<u32>();
+            let base: u32 =
+                cfg.proxy.memory.0 + cfg.servers.values().map(|s| s.memory.0).sum::<u32>();
             // Grob: JVM braucht ueber dem Heap noch etwas, und die
             // Datenbanken wollen auch leben.
             let fits = (mb as i64 - i64::from(base) - 1536) / i64::from(cfg.mines.memory.0);
@@ -360,13 +378,6 @@ pub fn parse_velocity(text: &str) -> Velocity {
         }
     }
     v
-}
-
-/// Findet velocity.toml unabhaengig davon, wo sie liegt - fuer Tests.
-pub fn velocity_of(dir: &Path) -> Option<Velocity> {
-    fs::read_to_string(dir.join("velocity.toml"))
-        .ok()
-        .map(|t| parse_velocity(&t))
 }
 
 #[cfg(test)]

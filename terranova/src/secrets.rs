@@ -71,7 +71,11 @@ mod tests {
         let file = dir.join("sub").join("x.secret");
         let (first, created) = load_or_create(&file).unwrap();
         assert!(created);
-        assert_eq!(fs::read(&file).unwrap(), first.as_bytes(), "ohne Zeilenumbruch");
+        assert_eq!(
+            fs::read(&file).unwrap(),
+            first.as_bytes(),
+            "ohne Zeilenumbruch"
+        );
         let (second, created) = load_or_create(&file).unwrap();
         assert!(!created);
         assert_eq!(first, second);
@@ -82,7 +86,10 @@ mod tests {
         let dir = crate::testutil::tempdir("secrets-trim");
         let file = dir.join("y.secret");
         fs::write(&file, "abc123\r\n").unwrap();
-        assert_eq!(load_or_create(&file).unwrap(), ("abc123".to_string(), false));
+        assert_eq!(
+            load_or_create(&file).unwrap(),
+            ("abc123".to_string(), false)
+        );
     }
 
     #[test]

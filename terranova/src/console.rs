@@ -97,10 +97,6 @@ impl LineRing {
         seq
     }
 
-    pub fn next_seq(&self) -> u64 {
-        self.lock().next
-    }
-
     fn collect(g: &Inner, since: u64) -> Batch {
         let oldest = g.lines.front().map_or(g.next, |l| l.seq);
         let gap = (since < oldest && since < g.next).then_some((since, oldest));

@@ -309,7 +309,11 @@ pub fn parse_dur(s: &str) -> Result<Dur, String> {
         "m" => n * 60,
         "h" => n * 3600,
         "d" => n * 86_400,
-        _ => return Err(format!("'{s}': unbekannte Einheit, erlaubt sind s, m, h, d")),
+        _ => {
+            return Err(format!(
+                "'{s}': unbekannte Einheit, erlaubt sind s, m, h, d"
+            ))
+        }
     };
     Ok(Dur(Duration::from_secs(secs)))
 }
@@ -386,10 +390,6 @@ impl NodeKind {
     pub fn is_minecraft(self) -> bool {
         matches!(self, NodeKind::Proxy | NodeKind::Server | NodeKind::Mine(_))
     }
-
-    pub fn is_dependency(self) -> bool {
-        matches!(self, NodeKind::MariaDb | NodeKind::Redis)
-    }
 }
 
 /// Alles, was es braucht, um einen Proxy oder Server zu starten.
@@ -418,8 +418,7 @@ pub const PROXY: &str = "proxy";
 impl Config {
     pub fn load(paths: &Paths) -> Result<Config, String> {
         let file = paths.config();
-        let text =
-            fs::read_to_string(&file).map_err(|e| format!("{}: {e}", file.display()))?;
+        let text = fs::read_to_string(&file).map_err(|e| format!("{}: {e}", file.display()))?;
         Config::parse(&text).map_err(|e| format!("{}: {e}", file.display()))
     }
 
@@ -504,7 +503,9 @@ impl Config {
         if let Some(slot) = crate::mines::parse_name(name) {
             return (slot <= self.mines.slots).then(|| self.mine_node(paths, slot));
         }
-        self.server_nodes(paths).into_iter().find(|n| n.name == name)
+        self.server_nodes(paths)
+            .into_iter()
+            .find(|n| n.name == name)
     }
 
     pub fn validate(&self) -> Result<(), String> {
@@ -540,18 +541,27 @@ impl Config {
         ];
         for (name, s) in &self.servers {
             ports.push((s.port.into(), name.clone()));
-            ports.push((u32::from(s.port) + u32::from(self.rcon_offset), format!("{name} (RCON)")));
+            ports.push((
+                u32::from(s.port) + u32::from(self.rcon_offset),
+                format!("{name} (RCON)"),
+            ));
         }
         for slot in 1..=u32::from(self.mines.slots) {
             let p = u32::from(self.mines.base_port) + slot;
             ports.push((p, format!("mining-{slot}")));
-            ports.push((p + u32::from(self.rcon_offset), format!("mining-{slot} (RCON)")));
+            ports.push((
+                p + u32::from(self.rcon_offset),
+                format!("mining-{slot} (RCON)"),
+            ));
         }
         let mut sorted = ports.clone();
         sorted.sort();
         for w in sorted.windows(2) {
             if w[0].0 == w[1].0 {
-                problems.push(format!("Port {} doppelt: {} und {}", w[0].0, w[0].1, w[1].1));
+                problems.push(format!(
+                    "Port {} doppelt: {} und {}",
+                    w[0].0, w[0].1, w[1].1
+                ));
             }
         }
         for (p, what) in &ports {
@@ -566,14 +576,15 @@ impl Config {
             }
             for s in &r.servers {
                 if !self.servers.contains_key(s) {
-                    problems.push(format!("schedule.daily_restart.servers: '{s}' gibt es nicht"));
+                    problems.push(format!(
+                        "schedule.daily_restart.servers: '{s}' gibt es nicht"
+                    ));
                 }
             }
         }
 
         for db in &self.deps.mariadb.databases {
-            let ok = !db.is_empty()
-                && db.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+            let ok = !db.is_empty() && db.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
             if !ok {
                 problems.push(format!("Datenbankname '{db}': nur a-z, 0-9 und _"));
             }
@@ -598,11 +609,17 @@ mod tests {
         let c = Config::parse(EXAMPLE).expect("terranova.yml");
         assert_eq!(c.servers.len(), 3);
         assert_eq!(c.servers["main"].memory, Mem(4096));
-        assert_eq!(c.servers["main"].stop_timeout, Some(Dur(Duration::from_secs(180))));
+        assert_eq!(
+            c.servers["main"].stop_timeout,
+            Some(Dur(Duration::from_secs(180)))
+        );
         assert_eq!(c.proxy.memory, Mem(512));
         assert_eq!(c.mines.lifetime, Dur(Duration::from_secs(24 * 3600)));
         assert_eq!(c.schedule.reap_every, Dur(Duration::from_secs(15 * 60)));
-        assert_eq!(c.schedule.daily_restart.as_ref().unwrap().time(), Ok((4, 0)));
+        assert_eq!(
+            c.schedule.daily_restart.as_ref().unwrap().time(),
+            Ok((4, 0))
+        );
         assert_eq!(c.deps.mariadb.databases.len(), 8);
     }
 
@@ -622,7 +639,10 @@ mod tests {
         let names: Vec<_> = c.server_nodes(&p).into_iter().map(|n| n.name).collect();
         assert_eq!(names, ["main", "build", "farm"]);
         let m = c.mine_node(&p, 3);
-        assert_eq!((m.name.as_str(), m.port, m.rcon_port), ("mining-3", 25573, Some(25673)));
+        assert_eq!(
+            (m.name.as_str(), m.port, m.rcon_port),
+            ("mining-3", 25573, Some(25673))
+        );
         assert_eq!(m.motd.as_deref(), Some("Terranova Mine 3"));
         assert_eq!(m.dir, p.root.join("servers").join("mining-3"));
         assert!(c.node(&p, "mining-9").is_none(), "nur 8 Plaetze");

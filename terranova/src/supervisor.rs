@@ -542,7 +542,10 @@ impl Supervisor {
         // Zweiter Versuch ueber RCON, falls stdin nicht angekommen ist.
         if node.spec.kind.is_minecraft() {
             self.log(format!("{name}: reagiert nicht, Versuch ueber RCON"));
-            self.rcon(node, backend::stop_command(node.spec.kind).unwrap_or("stop"));
+            self.rcon(
+                node,
+                backend::stop_command(node.spec.kind).unwrap_or("stop"),
+            );
             if node.wait_stopped(Duration::from_secs(30)) {
                 self.log(format!("{name}: gestoppt"));
                 return true;
@@ -571,12 +574,7 @@ impl Supervisor {
 
     fn rcon(&self, node: &Arc<Node>, command: &str) -> Option<String> {
         let port = node.spec.rcon_port?;
-        match rcon::command(
-            port,
-            &self.rcon_password,
-            command,
-            Duration::from_secs(10),
-        ) {
+        match rcon::command(port, &self.rcon_password, command, Duration::from_secs(10)) {
             Ok(reply) => Some(reply),
             Err(e) => {
                 self.log(format!("{}: RCON {port}: {e}", node.spec.name));
@@ -646,7 +644,10 @@ impl Supervisor {
         for node in &to_start {
             if node.spec.template.is_some() {
                 if let Err(e) = syncer.sync(&node.spec, false) {
-                    self.log(format!("{}: Bestuecken fehlgeschlagen: {e}", node.spec.name));
+                    self.log(format!(
+                        "{}: Bestuecken fehlgeschlagen: {e}",
+                        node.spec.name
+                    ));
                 }
             }
             if let Err(e) = self.start_node(node) {
@@ -801,8 +802,7 @@ impl Supervisor {
     pub fn restart_node(self: &Arc<Self>, node: &Arc<Node>) {
         self.stop_node(node);
         if node.spec.template.is_some() {
-            match sync::Syncer::new(&self.paths, &self.cfg)
-                .and_then(|s| s.sync(&node.spec, false))
+            match sync::Syncer::new(&self.paths, &self.cfg).and_then(|s| s.sync(&node.spec, false))
             {
                 Ok(r) if !r.pruned.is_empty() => self.log(format!(
                     "{}: {} veraltete Datei(en) entfernt",
@@ -891,14 +891,18 @@ fn tail_log(node: Arc<Node>) {
             let mut rest = Vec::new();
             while node.status() != Status::Stopped {
                 thread::sleep(Duration::from_millis(500));
-                let Ok(meta) = fs::metadata(&path) else { continue };
+                let Ok(meta) = fs::metadata(&path) else {
+                    continue;
+                };
                 if meta.len() < pos {
                     pos = 0; // Datei wurde gedreht
                 }
                 if meta.len() == pos {
                     continue;
                 }
-                let Ok(mut f) = fs::File::open(&path) else { continue };
+                let Ok(mut f) = fs::File::open(&path) else {
+                    continue;
+                };
                 use std::io::{Read, Seek, SeekFrom};
                 if f.seek(SeekFrom::Start(pos)).is_err() {
                     continue;
@@ -971,7 +975,10 @@ mod tests {
         fs::write(from.join("plugins").join("X").join("config.yml"), "b: 2").unwrap();
         let to = dir.join("mining-1");
         copy_tree(&from, &to).unwrap();
-        assert_eq!(fs::read_to_string(to.join("server.properties")).unwrap(), "a=1");
+        assert_eq!(
+            fs::read_to_string(to.join("server.properties")).unwrap(),
+            "a=1"
+        );
         assert!(to.join("plugins").join("X").join("config.yml").is_file());
     }
 }

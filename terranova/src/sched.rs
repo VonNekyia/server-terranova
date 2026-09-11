@@ -82,7 +82,11 @@ mod tests {
     #[test]
     fn der_plan_aus_der_config_ist_lesbar() {
         let cfg = Config::parse(EXAMPLE_CONFIG).unwrap();
-        let plan = cfg.schedule.daily_restart.as_ref().expect("taeglicher Neustart");
+        let plan = cfg
+            .schedule
+            .daily_restart
+            .as_ref()
+            .expect("taeglicher Neustart");
         assert_eq!(plan.time(), Ok((4, 0)));
         assert_eq!(plan.servers, ["main", "build", "farm"]);
         assert_eq!(plan.gap.0.as_secs(), 120);

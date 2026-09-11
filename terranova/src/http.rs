@@ -67,7 +67,11 @@ impl Response {
     }
 
     pub fn text(status: u16, body: impl Into<String>) -> Response {
-        Response::new(status, "text/plain; charset=utf-8", body.into().into_bytes())
+        Response::new(
+            status,
+            "text/plain; charset=utf-8",
+            body.into().into_bytes(),
+        )
     }
 
     pub fn html(body: impl Into<Vec<u8>>) -> Response {
@@ -80,11 +84,14 @@ impl Response {
     }
 }
 
+/// Was ein Handler in den offenen Strom schreibt.
+pub type Streamer = Box<dyn FnOnce(&mut dyn Write) -> io::Result<()> + Send>;
+
 /// Was ein Handler zurueckgibt: eine fertige Antwort oder ein offener Strom
 /// fuer Server-Sent Events.
 pub enum Reply {
     Done(Response),
-    Stream(Box<dyn FnOnce(&mut dyn Write) -> io::Result<()> + Send>),
+    Stream(Streamer),
 }
 
 fn reason(status: u16) -> &'static str {
@@ -282,13 +289,13 @@ pub fn percent_decode(s: &str) -> String {
 /// verteilt, wie es das Format verlangt.
 pub fn write_event(w: &mut dyn Write, id: Option<u64>, name: &str, data: &str) -> io::Result<()> {
     if let Some(id) = id {
-        write!(w, "id: {id}\n")?;
+        writeln!(w, "id: {id}")?;
     }
     if !name.is_empty() {
-        write!(w, "event: {name}\n")?;
+        writeln!(w, "event: {name}")?;
     }
     for line in data.split('\n') {
-        write!(w, "data: {line}\n")?;
+        writeln!(w, "data: {line}")?;
     }
     w.write_all(b"\n")?;
     w.flush()
@@ -325,9 +332,8 @@ fn send_request(
     body: Option<&[u8]>,
     extra: &[(&str, &str)],
 ) -> io::Result<()> {
-    let mut head = format!(
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n"
-    );
+    let mut head =
+        format!("{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n");
     if !token.is_empty() {
         head.push_str(&format!("Authorization: Bearer {token}\r\n"));
     }
@@ -353,7 +359,12 @@ fn read_status_and_headers(r: &mut impl BufRead) -> io::Result<u16> {
         .split_whitespace()
         .nth(1)
         .and_then(|s| s.parse().ok())
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("keine Antwort: {line:?}")))?;
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("keine Antwort: {line:?}"),
+            )
+        })?;
     loop {
         let mut h = String::new();
         if r.read_line(&mut h)? == 0 || h == "\r\n" || h == "\n" {
@@ -465,13 +476,24 @@ mod tests {
             ))
         });
         let t = Duration::from_secs(5);
-        let (s, b) = request(port, "POST", "/api/x?since=7", "geheim", Some(b"{\"a\":1}"), t).unwrap();
+        let (s, b) = request(
+            port,
+            "POST",
+            "/api/x?since=7",
+            "geheim",
+            Some(b"{\"a\":1}"),
+            t,
+        )
+        .unwrap();
         assert_eq!(s, 200);
         assert!(b.contains("\"m\":\"POST\""), "{b}");
         assert!(b.contains("\"p\":\"/api/x\""), "{b}");
         assert!(b.contains("\"q\":\"7\""), "{b}");
         assert!(b.contains("Bearer geheim"), "{b}");
-        assert!(b.contains("{\\\"a\\\":1}") || b.contains("{\"a\":1}"), "{b}");
+        assert!(
+            b.contains("{\\\"a\\\":1}") || b.contains("{\"a\":1}"),
+            "{b}"
+        );
     }
 
     #[test]
@@ -516,7 +538,11 @@ mod tests {
             got,
             [
                 (Some(1), "out".to_string(), "erste Zeile".to_string()),
-                (Some(2), "out".to_string(), "zweite\nmit Umbruch".to_string()),
+                (
+                    Some(2),
+                    "out".to_string(),
+                    "zweite\nmit Umbruch".to_string()
+                ),
                 (Some(3), "sys".to_string(), "Schluss".to_string()),
             ]
         );

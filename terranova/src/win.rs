@@ -19,8 +19,8 @@ use windows_sys::Win32::Security::Cryptography::{
 use windows_sys::Win32::System::Console::SetConsoleCtrlHandler;
 use windows_sys::Win32::System::SystemInformation::GetLocalTime;
 use windows_sys::Win32::System::Threading::{
-    GetExitCodeProcess, GetProcessTimes, OpenProcess, QueryFullProcessImageNameW,
-    TerminateProcess, WaitForSingleObject,
+    GetExitCodeProcess, GetProcessTimes, OpenProcess, QueryFullProcessImageNameW, TerminateProcess,
+    WaitForSingleObject,
 };
 
 // --- Flags fuer std::process::Command::creation_flags ----------------------
@@ -33,7 +33,6 @@ use windows_sys::Win32::System::Threading::{
 pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 pub const DETACHED_PROCESS: u32 = 0x0000_0008;
 pub const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-pub const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
 
 const PROCESS_TERMINATE: u32 = 0x0001;
 const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
@@ -141,7 +140,14 @@ pub fn port_owner(port: u16) -> Option<u32> {
 fn listeners(af: u32, row: usize, port_off: usize, pid_off: usize) -> Vec<(u16, u32)> {
     let mut size: u32 = 0;
     unsafe {
-        GetExtendedTcpTable(ptr::null_mut(), &mut size, 0, af, TCP_TABLE_OWNER_PID_LISTENER, 0);
+        GetExtendedTcpTable(
+            ptr::null_mut(),
+            &mut size,
+            0,
+            af,
+            TCP_TABLE_OWNER_PID_LISTENER,
+            0,
+        );
     }
     // Die Tabelle kann zwischen den Aufrufen wachsen.
     for _ in 0..4 {
@@ -170,7 +176,12 @@ fn listeners(af: u32, row: usize, port_off: usize, pid_off: usize) -> Vec<(u16, 
                     break;
                 }
                 let at = |o: usize| {
-                    u32::from_le_bytes([bytes[base + o], bytes[base + o + 1], bytes[base + o + 2], bytes[base + o + 3]])
+                    u32::from_le_bytes([
+                        bytes[base + o],
+                        bytes[base + o + 1],
+                        bytes[base + o + 2],
+                        bytes[base + o + 3],
+                    ])
                 };
                 let p = at(port_off);
                 let port = (((p & 0xFF) << 8) | ((p >> 8) & 0xFF)) as u16;

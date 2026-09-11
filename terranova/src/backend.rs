@@ -66,8 +66,6 @@ pub struct Discovered {
 }
 
 pub trait Backend: Send + Sync {
-    fn name(&self) -> &'static str;
-
     /// Startet den Knoten mit angeschlossenen Pipes.
     fn spawn(&self, node: &NodeSpec) -> io::Result<Child>;
 
@@ -149,10 +147,6 @@ impl Native {
 }
 
 impl Backend for Native {
-    fn name(&self) -> &'static str {
-        "native"
-    }
-
     fn spawn(&self, node: &NodeSpec) -> io::Result<Child> {
         let mut cmd = match node.kind {
             NodeKind::MariaDb => {
@@ -183,7 +177,11 @@ impl Backend for Native {
                 c
             }
             _ => {
-                let pattern = if node.is_proxy() { "velocity" } else { "paper-" };
+                let pattern = if node.is_proxy() {
+                    "velocity"
+                } else {
+                    "paper-"
+                };
                 let jar = find_jar(&node.dir, pattern).ok_or_else(|| {
                     io::Error::new(
                         io::ErrorKind::NotFound,
@@ -260,12 +258,21 @@ mod tests {
 
     #[test]
     fn fertigmeldungen() {
-        assert!(is_ready_line(NodeKind::Server, "[00:21:24] [Server thread/INFO]: Done (56.579s)! For help, type \"help\""));
+        assert!(is_ready_line(
+            NodeKind::Server,
+            "[00:21:24] [Server thread/INFO]: Done (56.579s)! For help, type \"help\""
+        ));
         // deutsches Dezimalkomma
         assert!(is_ready_line(NodeKind::Proxy, "[main/INFO]: Done (0,93s)!"));
         assert!(!is_ready_line(NodeKind::Server, "Preparing spawn area"));
-        assert!(is_ready_line(NodeKind::MariaDb, "mysqld.exe: ready for connections."));
-        assert!(is_ready_line(NodeKind::Redis, "* Ready to accept connections tcp"));
+        assert!(is_ready_line(
+            NodeKind::MariaDb,
+            "mysqld.exe: ready for connections."
+        ));
+        assert!(is_ready_line(
+            NodeKind::Redis,
+            "* Ready to accept connections tcp"
+        ));
     }
 
     #[test]

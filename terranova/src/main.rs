@@ -3,10 +3,6 @@
 //! Die CLI ist die eigentliche Schnittstelle; start.bat ruft sie nur auf, und
 //! das Dashboard spricht dieselbe API wie sie.
 
-// Faellt weg, sobald die CLI vollstaendig ist - bis dahin sind die Bausteine
-// da, aber noch nicht alle verdrahtet.
-#![allow(dead_code)]
-
 use std::process::ExitCode;
 
 mod api;

@@ -35,10 +35,10 @@ impl Client {
         let token = fs::read_to_string(paths.api_token())
             .map(|t| t.trim().to_string())
             .unwrap_or_default();
-        Ok(Client {
-            port: cfg.dashboard.port,
-            token,
-        })
+        // Laeuft schon einer, gilt sein Port - die Config koennte seit
+        // seinem Start geaendert worden sein.
+        let port = read_info(paths).map_or(cfg.dashboard.port, |i| i.port);
+        Ok(Client { port, token })
     }
 
     pub fn token(&self) -> &str {
@@ -149,9 +149,9 @@ pub fn shadow_copy(paths: &Paths) -> io::Result<std::path::PathBuf> {
 /// bleiben einem Prozess etwa fuenf Sekunden, und ein Supervisor, der in
 /// dieser Zeit stirbt, nimmt die Pipes aller Server mit.
 pub fn spawn_detached(paths: &Paths, exe: &Path) -> io::Result<u32> {
-    use std::process::{Command, Stdio};
     #[cfg(windows)]
     use std::os::windows::process::CommandExt as _;
+    use std::process::{Command, Stdio};
 
     let mut cmd = Command::new(exe);
     cmd.arg("supervise")

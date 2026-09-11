@@ -23,7 +23,9 @@ use crate::win;
 
 /// Wo MariaDB nach dem Entpacken liegt.
 pub fn mariadb_base(paths: &Paths, version: &str) -> PathBuf {
-    paths.mariadb_home().join(format!("mariadb-{version}-winx64"))
+    paths
+        .mariadb_home()
+        .join(format!("mariadb-{version}-winx64"))
 }
 
 pub fn mariadb_bin(paths: &Paths, version: &str) -> PathBuf {
@@ -94,8 +96,12 @@ pub fn ensure_mariadb(paths: &Paths, cfg: &Config, log: &mut dyn FnMut(&str)) ->
     let version = &cfg.deps.mariadb.version;
     let bin = mariadb_bin(paths, version);
     if !bin.join("mysqld.exe").is_file() {
-        let zip = paths.mariadb_home().join(format!("mariadb-{version}-winx64.zip"));
-        log(&format!("MariaDB {version} wird einmalig heruntergeladen (ca. 87 MB)..."));
+        let zip = paths
+            .mariadb_home()
+            .join(format!("mariadb-{version}-winx64.zip"));
+        log(&format!(
+            "MariaDB {version} wird einmalig heruntergeladen (ca. 87 MB)..."
+        ));
         download(
             &format!(
                 "https://archive.mariadb.org/mariadb-{version}/winx64-packages/mariadb-{version}-winx64.zip"
@@ -245,12 +251,14 @@ pub fn provision(paths: &Paths, cfg: &Config, runtime: crate::config::Runtime) -
         return crate::docker::provision(&d, &sql);
     }
 
-    let out = quiet(&mut Command::new(mariadb_bin(paths, &db.version).join("mysql.exe")))
-        .args(["-h", "127.0.0.1", "-P"])
-        .arg(db.port.to_string())
-        .args(["-u", "root", "--protocol=tcp", "-e"])
-        .arg(&sql)
-        .output()?;
+    let out = quiet(&mut Command::new(
+        mariadb_bin(paths, &db.version).join("mysql.exe"),
+    ))
+    .args(["-h", "127.0.0.1", "-P"])
+    .arg(db.port.to_string())
+    .args(["-u", "root", "--protocol=tcp", "-e"])
+    .arg(&sql)
+    .output()?;
     if !out.status.success() {
         return Err(io::Error::other(format!(
             "Datenbanken anlegen fehlgeschlagen: {}",

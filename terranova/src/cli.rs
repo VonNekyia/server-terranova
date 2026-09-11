@@ -192,12 +192,17 @@ fn supervise(paths: Paths, cfg: Config) -> ExitCode {
     let (port, _token) = match crate::api::serve(sup.clone()) {
         Ok(p) => p,
         Err(e) => {
-            sup.log(format!("Schnittstelle auf Port {} : {e}", sup.cfg.dashboard.port));
+            sup.log(format!(
+                "Schnittstelle auf Port {} : {e}",
+                sup.cfg.dashboard.port
+            ));
             return ExitCode::FAILURE;
         }
     };
     let _ = client::write_info(&sup.paths, port);
-    sup.log(format!("Terranova {VERSION} - Schnittstelle auf 127.0.0.1:{port}"));
+    sup.log(format!(
+        "Terranova {VERSION} - Schnittstelle auf 127.0.0.1:{port}"
+    ));
 
     // Was schon laeuft, uebernehmen - etwa nach einem Absturz des
     // Supervisors, waehrend die Server weiterliefen.
@@ -222,11 +227,11 @@ fn supervise(paths: Paths, cfg: Config) -> ExitCode {
 
 /// Port und Token fuer den Konsolen-Ereignisbehandler, der keine Umgebung
 /// mitbekommen kann.
-static VIEWER: OnceLock<(u16, String)> = OnceLock::new();
+static VIEWER: OnceLock<(u16, String, crate::config::WindowClose)> = OnceLock::new();
 static CTRL_COUNT: AtomicU32 = AtomicU32::new(0);
 
 fn on_ctrl(ev: win::CtrlEvent) -> bool {
-    let Some((port, token)) = VIEWER.get() else {
+    let Some((port, token, on_close)) = VIEWER.get() else {
         return false;
     };
     let stop = |timeout| {
@@ -251,10 +256,14 @@ fn on_ctrl(ev: win::CtrlEvent) -> bool {
             }
             true
         }
-        // Hier bleiben etwa fuenf Sekunden. Der Supervisor laeuft eigenstaendig
-        // weiter und bringt das Herunterfahren allein zu Ende.
+        // Hier bleiben etwa fuenf Sekunden. Weil der Supervisor eigenstaendig
+        // laeuft, genuegt es, ihm Bescheid zu sagen - er bringt das
+        // Herunterfahren allein zu Ende, auch wenn dieses Fenster schon weg
+        // ist. Mit on_window_close: detach laeuft das Netzwerk einfach weiter.
         win::CtrlEvent::Close | win::CtrlEvent::Shutdown => {
-            stop(Duration::from_secs(2));
+            if *on_close == crate::config::WindowClose::Stop {
+                stop(Duration::from_secs(2));
+            }
             true
         }
     }
@@ -310,10 +319,17 @@ fn view(paths: &Paths, cfg: &Config) -> ExitCode {
     let Ok(c) = Client::new(paths, cfg) else {
         return ExitCode::FAILURE;
     };
-    let _ = VIEWER.set((c.port, c.token().to_string()));
+    let _ = VIEWER.set((c.port, c.token().to_string(), cfg.dashboard.on_window_close));
     win::on_console_ctrl(on_ctrl);
 
-    println!("[terranova] Strg+C faehrt das Netzwerk herunter. Dashboard: http://127.0.0.1:{}", c.port);
+    let beim_schliessen = match cfg.dashboard.on_window_close {
+        crate::config::WindowClose::Stop => "Fenster schliessen faehrt es ebenfalls herunter",
+        crate::config::WindowClose::Detach => "Fenster schliessen laesst es weiterlaufen",
+    };
+    // Zwei Aufrufe statt einer mehrzeiligen Zeichenkette: cargo fmt zieht
+    // deren Fortsetzung sonst die Einrueckung des Quelltexts mit.
+    println!("[terranova] Strg+C faehrt das Netzwerk herunter, {beim_schliessen}.");
+    println!("[terranova] Dashboard: http://127.0.0.1:{}", c.port);
     let r = c.follow("/api/events", None, |ev| {
         if ev.name != "gap" {
             println!("{}", ev.data);
@@ -465,7 +481,11 @@ fn status(paths: &Paths, cfg: &Config) -> ExitCode {
                     n["port"].as_u64().unwrap_or(0),
                     n["pid"].as_u64().map_or("-".to_string(), |p| p.to_string()),
                     up,
-                    if n["control"] == "adopted" { "  uebernommen" } else { "" },
+                    if n["control"] == "adopted" {
+                        "  uebernommen"
+                    } else {
+                        ""
+                    },
                 );
             }
             ExitCode::SUCCESS
@@ -604,11 +624,7 @@ fn mine(paths: &Paths, cfg: &Config, args: &Args) -> ExitCode {
 
     match action {
         "open" => {
-            let count: u8 = args
-                .values
-                .get(1)
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(1);
+            let count: u8 = args.values.get(1).and_then(|v| v.parse().ok()).unwrap_or(1);
             let body = match args.slot {
                 Some(s) => json!({ "count": count, "slot": s }),
                 None => json!({ "count": count }),
@@ -629,14 +645,20 @@ fn mine(paths: &Paths, cfg: &Config, args: &Args) -> ExitCode {
             }
         }
         "close" => {
-            let Some(slot) = args.values.get(1).and_then(|v| v.parse::<u8>().ok()).or(args.slot)
+            let Some(slot) = args
+                .values
+                .get(1)
+                .and_then(|v| v.parse::<u8>().ok())
+                .or(args.slot)
             else {
                 eprintln!("terranova: welcher Dungeon?");
                 return ExitCode::from(2);
             };
             report(
                 c.post(&format!("/api/mines/{slot}/close"), json!({})),
-                &format!("[terranova] mining-{slot} geschlossen - die Welt bleibt bis zum Abraeumen"),
+                &format!(
+                    "[terranova] mining-{slot} geschlossen - die Welt bleibt bis zum Abraeumen"
+                ),
             )
         }
         "list" => match c.get("/api/mines") {
@@ -756,7 +778,11 @@ fn sync_cmd(paths: &Paths, cfg: &Config, which: &[String], dry_run: bool) -> Exi
                         parts.push(format!("{} kopiert", r.copied.len()));
                     }
                     if !r.pruned.is_empty() {
-                        parts.push(format!("{} entfernt ({})", r.pruned.len(), r.pruned.join(", ")));
+                        parts.push(format!(
+                            "{} entfernt ({})",
+                            r.pruned.len(),
+                            r.pruned.join(", ")
+                        ));
                     }
                     if r.props {
                         parts.push("server.properties".into());
@@ -766,7 +792,11 @@ fn sync_cmd(paths: &Paths, cfg: &Config, which: &[String], dry_run: bool) -> Exi
                     }
                     parts.join(", ")
                 };
-                let prefix = if dry_run { "[sync, Probelauf]" } else { "[sync]" };
+                let prefix = if dry_run {
+                    "[sync, Probelauf]"
+                } else {
+                    "[sync]"
+                };
                 println!("{prefix} {:<10} {what}", node.name);
             }
             Err(e) => {

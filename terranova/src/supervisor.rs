@@ -193,9 +193,11 @@ impl Supervisor {
         let backend: Box<dyn Backend> = match cfg.runtime() {
             Runtime::Native => Box::new(Native::new(&paths, &cfg)),
             Runtime::Docker => {
-                return Err(io::Error::other(
-                    "Laufzeit docker gibt es noch nicht - runtime: native setzen",
-                ))
+                let d = crate::docker::Docker::new(&paths, &cfg);
+                // Lieber hier klar scheitern als spaeter mit Servern, die
+                // ihre Datenbank nicht finden.
+                d.preflight().map_err(io::Error::other)?;
+                Box::new(d)
             }
         };
         let (rcon_password, _) = secrets::load_or_create(&paths.rcon_secret())?;
@@ -512,7 +514,13 @@ impl Supervisor {
 
         match node.spec.kind {
             NodeKind::MariaDb => {
-                deps::stop_mariadb(&self.paths, &self.cfg);
+                // Nativ ueber ihr eigenes Protokoll; im Container reicht
+                // SIGTERM, das mariadbd sauber behandelt.
+                if self.cfg.runtime() == Runtime::Native {
+                    deps::stop_mariadb(&self.paths, &self.cfg);
+                } else {
+                    self.backend.soft_stop(&node.spec, timeout);
+                }
             }
             NodeKind::Redis => {
                 deps::stop_redis(node.spec.port);
@@ -537,6 +545,15 @@ impl Supervisor {
             self.rcon(node, backend::stop_command(node.spec.kind).unwrap_or("stop"));
             if node.wait_stopped(Duration::from_secs(30)) {
                 self.log(format!("{name}: gestoppt"));
+                return true;
+            }
+        }
+
+        // Unter Docker gibt es noch einen sanften Weg: docker stop schickt
+        // SIGTERM, und die JVM laeuft ihren Shutdown-Hook.
+        if self.backend.soft_stop(&node.spec, Duration::from_secs(60)) {
+            self.log(format!("{name}: ueber den Container gestoppt"));
+            if node.wait_stopped(Duration::from_secs(90)) {
                 return true;
             }
         }
@@ -644,8 +661,12 @@ impl Supervisor {
 
     pub fn start_deps(self: &Arc<Self>) -> io::Result<()> {
         let mut log = |m: &str| self.log(m);
-        deps::ensure_mariadb(&self.paths, &self.cfg, &mut log)?;
-        deps::ensure_redis(&self.paths, &self.cfg, &mut log)?;
+        if self.cfg.runtime() == Runtime::Native {
+            deps::ensure_mariadb(&self.paths, &self.cfg, &mut log)?;
+            deps::ensure_redis(&self.paths, &self.cfg, &mut log)?;
+        } else {
+            crate::docker::pull_images(&self.cfg, &mut log);
+        }
 
         if let Some(n) = self.node("mariadb") {
             self.start_node(&n)?;
@@ -654,7 +675,7 @@ impl Supervisor {
                 return Err(io::Error::other("MariaDB antwortet nicht"));
             }
             n.mark_ready();
-            deps::provision(&self.paths, &self.cfg)?;
+            deps::provision(&self.paths, &self.cfg, self.cfg.runtime())?;
             self.log("Datenbanken bereit");
         }
         if let Some(n) = self.node("redis") {

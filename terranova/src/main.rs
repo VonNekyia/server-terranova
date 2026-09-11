@@ -16,6 +16,7 @@ mod client;
 mod config;
 mod console;
 mod deps;
+mod docker;
 mod doctor;
 mod http;
 mod mines;

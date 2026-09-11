@@ -216,7 +216,7 @@ fn sql_quote(s: &str) -> String {
 /// Legt Datenbanken und den Benutzer an. Wie in start.bat, nur enger:
 /// Rechte je Datenbank statt ALL PRIVILEGES ON *.*, und keinen Benutzer
 /// mehr fuer '%' - alles laeuft auf dieser Maschine.
-pub fn provision(paths: &Paths, cfg: &Config) -> io::Result<()> {
+pub fn provision(paths: &Paths, cfg: &Config, runtime: crate::config::Runtime) -> io::Result<()> {
     let db = &cfg.deps.mariadb;
     let mut sql = String::new();
     for name in &db.databases {
@@ -239,6 +239,11 @@ pub fn provision(paths: &Paths, cfg: &Config) -> io::Result<()> {
         }
     }
     sql.push_str("FLUSH PRIVILEGES;");
+
+    if runtime == crate::config::Runtime::Docker {
+        let d = crate::docker::Docker::new(paths, cfg);
+        return crate::docker::provision(&d, &sql);
+    }
 
     let out = quiet(&mut Command::new(mariadb_bin(paths, &db.version).join("mysql.exe")))
         .args(["-h", "127.0.0.1", "-P"])

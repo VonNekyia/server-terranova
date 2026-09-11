@@ -211,6 +211,36 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
         );
     }
 
+    // --- Docker ---------------------------------------------------------------
+    if cfg.runtime() == Runtime::Docker {
+        match crate::docker::Docker::new(paths, cfg).preflight() {
+            Ok(()) => add(Level::Ok, "Docker", "Host-Netzwerk funktioniert".into()),
+            Err(e) => add(Level::Fail, "Docker", e),
+        }
+        if let Some(mb) = crate::docker::mem_total_mb() {
+            let base: u32 = cfg.proxy.memory.0 + cfg.servers.values().map(|s| s.memory.0).sum::<u32>();
+            // Grob: JVM braucht ueber dem Heap noch etwas, und die
+            // Datenbanken wollen auch leben.
+            let fits = (mb as i64 - i64::from(base) - 1536) / i64::from(cfg.mines.memory.0);
+            let detail = format!(
+                "{mb} MB in der Docker-Maschine, Grundlast {base} MB - Platz fuer etwa {} Dungeon(s)",
+                fits.max(0)
+            );
+            if fits < 1 {
+                add(Level::Fail, "Speicher", format!(
+                    "{detail}. In %USERPROFILE%\\.wslconfig eintragen: [wsl2] memory=28GB, dann wsl --shutdown"
+                ));
+            } else if fits < i64::from(cfg.mines.slots) {
+                add(Level::Warn, "Speicher", format!(
+                    "{detail}, aber {} Plaetze vorgesehen. Mehr geht ueber %USERPROFILE%\\.wslconfig: [wsl2] memory=28GB",
+                    cfg.mines.slots
+                ));
+            } else {
+                add(Level::Ok, "Speicher", detail);
+            }
+        }
+    }
+
     // --- Reste aus der Skript-Zeit ----------------------------------------------
     if paths.root.join("scripts").is_dir() {
         add(

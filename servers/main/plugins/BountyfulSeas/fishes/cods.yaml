@@ -1,0 +1,94 @@
+# Dorschartige - Cods and their kin, cold water and deep.
+
+# Polardorsch — Boreogadus saida
+# Rekordlänge (TL): 40 cm — Quelle: FishBase Species Summary, Boreogadus saida
+# Lebensraum: arktische Meere, häufig eng an Meereis gebunden
+# Wassertiefe: 0–1383 m, meist 0–400 m | Temperatur: -2–8 °C | Aktivität: Tag und Nacht
+polar_cod:
+  lore:
+    - "Ein blasser Bewohner unter einer Decke aus Eis."
+  fish_name: "<gray>Polardorsch</gray>"
+  fish_item: "nexo:polar_cod"
+
+  max_length: 41
+  level: 3
+
+  water_type: [ocean]
+  vegetation: [cold]
+  modifier: [ice]
+
+  spawn_weight: 100
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 3
+
+# Kabeljau — Gadus morhua
+# Rekordlänge (TL): 200 cm — Quelle: FishBase Species Summary, Gadus morhua
+# Lebensraum: Nordatlantik, Schelfmeere und bodennahe Küstengewässer
+# Wassertiefe: Küstenwasser bis mehrere hundert Meter | Temperatur: kalt bis gemäßigt
+# Aktivität: Tag und Nacht
+atlantic_cod:
+  lore:
+    - "Ein kräftiger Schatten durchstreift die kalte Nordsee."
+  fish_name: "<gray>Kabeljau</gray>"
+  fish_item: "nexo:atlantic_cod"
+
+  max_length: 201
+  level: 8
+
+  water_type: [ocean]
+  vegetation: [cold, temperate]
+
+  spawn_weight: 100
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 5
+
+# Quappe — Lota lota
+# Rekordlänge (TL): 152 cm — Quelle: FishBase Species Summary, Lota lota
+# Lebensraum: kalte Seen und Flüsse, meist bodennah
+# Wassertiefe: flach bis tief je nach Gewässer | Temperatur: kalt | Aktivität: ausgeprägt nachtaktiv
+burbot:
+  lore:
+    - "Ein Kaltwasserjäger erwacht nach Sonnenuntergang."
+  fish_name: "<gray>Quappe</gray>"
+  fish_item: "nexo:burbot"
+
+  max_length: 153
+  level: 8
+
+  water_type: [river, lake]
+  vegetation: [cold]
+  condition: [night]
+
+  spawn_weight: 80
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 5
+
+# Seehecht — Merluccius merluccius
+# Rekordlänge (TL): 140 cm — Quelle: FishBase Species Summary, Merluccius merluccius
+# Lebensraum: bodennahe Bereiche des östlichen Atlantiks und Mittelmeers
+# Wassertiefe: 18–1075 m, meist 70–400 m | Temperatur: kühl bis gemäßigt | Aktivität: überwiegend nachts
+european_hake:
+  lore:
+    - "Ein schlanker Jäger steigt aus der dunklen Tiefe."
+  fish_name: "<gray>Seehecht</gray>"
+  fish_item: "nexo:european_hake"
+
+  max_length: 141
+  level: 9
+
+  water_type: [ocean]
+  vegetation: [cold, temperate]
+  depth: [deep]
+  condition: [night]
+
+  spawn_weight: 85
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 5

@@ -14,7 +14,7 @@ use crate::config::{Config, NodeKind, NodeSpec};
 use crate::paths::Paths;
 use crate::sys;
 
-/// Die Flags aus network.ps1, unveraendert uebernommen.
+/// Die Aikar-Flags, unveraendert aus dem alten Startskript uebernommen.
 pub const AIKAR: &[&str] = &[
     "-XX:+AlwaysPreTouch",
     "-XX:+DisableExplicitGC",
@@ -103,7 +103,8 @@ pub fn plausible_image(kind: NodeKind, image: &str) -> bool {
 }
 
 pub struct Native {
-    java: String,
+    paths: Paths,
+    java: crate::config::Java,
     mariadb_server: PathBuf,
     mariadb_data: PathBuf,
     redis_server: PathBuf,
@@ -116,7 +117,8 @@ pub struct Native {
 impl Native {
     pub fn new(paths: &Paths, cfg: &Config) -> Native {
         Native {
-            java: std::env::var("TERRANOVA_JAVA").unwrap_or_else(|_| cfg.java.path.clone()),
+            paths: paths.clone(),
+            java: cfg.java.clone(),
             mariadb_server: crate::deps::mariadb_server(paths, &cfg.deps.mariadb.version),
             mariadb_data: paths.mariadb_home().join("data"),
             redis_server: crate::deps::redis_server(paths),
@@ -128,7 +130,10 @@ impl Native {
     }
 
     fn java_command(&self, node: &NodeSpec, jar: &Path) -> Command {
-        let mut c = Command::new(&self.java);
+        // Erst hier aufgeloest: beim ersten Start wird ein fehlendes Java
+        // nachgeladen, nachdem dieser Knoten schon angelegt ist.
+        let (java, _) = crate::deps::resolve_java(&self.paths, &self.java);
+        let mut c = Command::new(java);
         c.arg(format!("-Xms{}M", node.memory.0));
         c.arg(format!("-Xmx{}M", node.memory.0));
         if self.aikar && !node.is_proxy() {

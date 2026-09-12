@@ -7,16 +7,20 @@
 out/
 
 # ---------------------------------------------------------------------------
-# Die drei festen Server liegen unter servers/. Versioniert ist dort nur, was
-# einem Server wirklich gehoert: seine server.properties und die Configs
-# seiner Plugins.
+# servers/          die drei festen Server. Was dort liegt, ist was laeuft -
+#                   Paper, die Plugin-Jars, die Configs. Alles versioniert,
+#                   damit ein Klon ohne Zwischenschritt startklar ist und
+#                   mehrere daran arbeiten koennen.
 #
-# Alles andere legt scripts/sync-servers.ps1 aus templates/ hinein - Paper,
-# die gemeinsamen Configs und die Plugin-Jars. Jedes Jar liegt damit genau
-# einmal im Repository, naemlich in templates/.
+# servers_dynamic/  die Dungeons. Sie entstehen aus templates/, leben einen
+#                   Tag und verschwinden - nichts davon gehoert ins
+#                   Repository.
 #
-# Faustregel: was start.bat, sync-servers.ps1, Paper oder ein Plugin selbst
-# wiederherstellen kann, wird nicht committet.
+# templates/        nur noch fuer die Dungeons: common/ ist die gemeinsame
+#                   Grundlage, daneben je Dungeon-Art eine Vorlage.
+#
+# Faustregel: was Paper, ein Plugin oder Terranova selbst wiederherstellen
+# kann, wird nicht committet. Und nichts, worin ein Geheimnis steht.
 # ---------------------------------------------------------------------------
 
 # Rust-Baustelle
@@ -25,19 +29,34 @@ terranova/target/
 # Von start.bat heruntergeladen und angelegt: MariaDB und Redis samt Daten
 runtime/
 
-# Aus templates/ in die Server kopiert
-servers/*/*.jar
-servers/*/plugins/*.jar
-servers/*/plugins/PlaceholderAPI/expansions/
-servers/*/config/
+# Die beiden Dateien je festem Server, in die Terranova beim Start ein
+# Geheimnis schreibt: das RCON-Passwort und das Forwarding-Secret. Sie
+# entstehen aus den .dist-Dateien daneben - und die gehoeren ins Repository.
 servers/*/server.properties
-# Liste dessen, was terranova sync hierher kopiert hat
-servers/*/.terranova-sync.json
-servers/*/eula.txt
-servers/*/bukkit.yml
-servers/*/spigot.yml
+servers/*/config/paper-global.yml
 
-# Dungeons: entstehen aus templates/mining und werden nach 24 h verworfen
+# Wer gesperrt ist und wer auf der Weissen Liste steht, haengt an diesem
+# einen Netzwerk. Paper legt die Dateien beim Start leer an, wenn sie fehlen.
+#
+# ops.json dagegen bleibt versioniert: da traegt sich jeder selbst ein, und
+# dann muss niemand sich auf einem frischen Klon erst wieder selbst opnen.
+servers/*/whitelist.json
+servers/*/banned-players.json
+servers/*/banned-ips.json
+
+# Was Plugins sich zur Laufzeit merken. Alles davon leitet sich aus der Welt
+# oder aus dem ab, was Spieler getan haben - und die Welten sind nicht
+# versioniert, also waere es hier ohnehin nur ein Stand von gestern.
+servers/*/plugins/TAB/playerdata.yml
+servers/*/plugins/Proficisci/storage/
+servers/*/plugins/BountyfulSeas/water_regions.bin
+# Liste dessen, was terranova sync einmal hierher kopiert hat
+servers/*/.terranova-sync.json
+
+# Dungeons: entstehen aus templates/, werden nach 24 h verworfen
+servers_dynamic/
+# Aus der Zeit, als sie noch neben den festen Servern lagen - der naechste
+# Start verschiebt sie hinueber.
 servers/mining-*/
 
 # Velocity: das Secret ist der einzige Schutz der Backends und gehoert nicht
@@ -58,6 +77,8 @@ servers/*/world_nether/
 servers/*/world_the_end/
 templates/*/world/
 **/usercache.json
+# Sperrdatei einer geoeffneten Welt - schreibt Minecraft beim Laden neu
+**/session.lock
 **/.console_history
 **/.paper/
 *.log

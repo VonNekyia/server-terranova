@@ -57,6 +57,25 @@ fn kind_str(k: NodeKind) -> &'static str {
     }
 }
 
+/// Die Schlagworte eines Knotens - woraus das Dashboard seine Gliederung
+/// baut.
+///
+/// Das erste sagt, was der Knoten *ist*: eine Datenbank, ein Schluessel-Wert-
+/// Speicher, der Proxy oder ein Paper-Server. Das letzte sagt, ob er zum
+/// festen Bestand gehoert oder zur Laufzeit kommt und geht. Ein Dungeon ist
+/// beides: ein Paper-Server, und zwar ein dynamischer.
+fn tags(k: NodeKind) -> &'static [&'static str] {
+    match k {
+        // Zwei Schlagworte: was es ist, und welcher Art. So steht bei beiden
+        // Datenbanken db, und daneben, worin sie sich unterscheiden.
+        NodeKind::MariaDb => &["db", "sql", "static"],
+        NodeKind::Redis => &["db", "value", "static"],
+        NodeKind::Proxy => &["proxy", "static"],
+        NodeKind::Server => &["paper", "static"],
+        NodeKind::Mine(_) => &["paper", "dungeon", "dynamic"],
+    }
+}
+
 fn bad(status: u16, msg: &str) -> Reply {
     Reply::Done(Response::new(
         status,
@@ -198,17 +217,20 @@ impl Api {
             (false, ["api", "mines"]) => self.mines(),
             (true, ["api", "mines", "open"]) => self.open_mines(&req),
             (true, ["api", "mines", "reap"]) => self.reap(&req),
-            (true, ["api", "mines", slot, "close"]) => match slot
-                .parse::<u8>()
-                .ok()
-                .and_then(|s| self.sup.node(&mines::name(s)))
-            {
-                Some(n) => {
-                    let sup = self.sup.clone();
-                    let ok = sup.stop_node(&n);
-                    ok_json(json!({ "stopped": ok }))
-                }
+            // Frueher weg als nach seiner Zeit - die Welt ist danach fort.
+            (true, ["api", "mines", slot, "reap"]) => match slot.parse::<u8>().ok() {
+                Some(s) => match crate::reaper::reap_one(&self.sup, s) {
+                    Ok(()) => ok_json(json!({ "reaped": mines::name(s) })),
+                    Err(e) => bad(409, &e),
+                },
                 None => bad(404, "kein solcher Dungeon"),
+            },
+
+            (true, ["api", "mines", slot, "close"]) => match slot.parse::<u8>().ok() {
+                Some(s) if self.sup.node(&mines::name(s)).is_some() => {
+                    ok_json(json!({ "stopped": self.sup.close_mine(s) }))
+                }
+                _ => bad(404, "kein solcher Dungeon"),
             },
 
             _ => bad(404, "unbekannter Weg"),
@@ -224,6 +246,7 @@ impl Api {
                 json!({
                     "name": n.spec.name,
                     "kind": kind_str(n.spec.kind),
+                    "tags": tags(n.spec.kind),
                     "status": n.status(),
                     "control": n.control(),
                     "pid": n.pid(),
@@ -303,23 +326,55 @@ impl Api {
             .iter()
             .map(|n| {
                 let opened = mines::opened_at(&n.spec.dir);
+                // Geschlossen laeuft die Uhr ab dem Schliessen - sonst
+                // stuende im Dashboard eine Restzeit, die nicht gilt.
+                let from = mines::expires_from(&n.spec.dir);
                 json!({
                     "name": n.spec.name,
                     "port": n.spec.port,
                     "status": n.status(),
                     "opened_at": opened,
+                    "closed": mines::closed_at(&n.spec.dir).is_some(),
                     "age_s": opened.map(|o| now.saturating_sub(o)),
-                    "expires_in_s": opened.map(|o| lifetime.as_secs().saturating_sub(now.saturating_sub(o))),
+                    "expires_in_s": from.map(|o| lifetime.as_secs().saturating_sub(now.saturating_sub(o))),
                 })
             })
             .collect();
-        ok_json(json!({ "slots": self.sup.cfg.mines.slots, "mines": list }))
+        ok_json(json!({
+            "slots": self.sup.cfg.mines.slots,
+            // Wie lange ein Dungeon lebt - das Dashboard sagt damit beim
+            // Schliessen, worauf man sich einlaesst.
+            "lifetime_s": lifetime.as_secs(),
+            "mines": list,
+            // Woraus sich ein dynamischer Server starten laesst, und was
+            // gilt, wenn niemand waehlt.
+            "templates": self.templates(),
+            "template": self.sup.cfg.mines.template,
+        }))
+    }
+
+    /// Die Vorlagen, aus denen sich ein dynamischer Server starten laesst.
+    fn templates(&self) -> Vec<String> {
+        let static_names: Vec<String> = self.sup.cfg.servers.keys().cloned().collect();
+        mines::templates(&self.sup.paths.templates(), &static_names)
     }
 
     fn open_mines(&self, req: &Request) -> Reply {
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let count = body.get("count").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
         let slot = body.get("slot").and_then(|v| v.as_u64()).map(|v| v as u8);
+        // Welche Vorlage - ohne Angabe die aus der Konfiguration.
+        let template = body
+            .get("template")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty());
+        // Nur was wirklich unter templates/ liegt: der Name landet sonst als
+        // Pfadbestandteil im Kopierbefehl.
+        if let Some(t) = template {
+            if !self.templates().iter().any(|k| k == t) {
+                return bad(400, &format!("keine Vorlage {t}"));
+            }
+        }
         let running = |n: u8| {
             self.sup
                 .node(&mines::name(n))
@@ -331,7 +386,7 @@ impl Api {
         };
         let mut opened = Vec::new();
         for s in picked {
-            match self.sup.open_mine(s) {
+            match self.sup.open_mine(s, template) {
                 Ok(n) => opened.push(json!({ "name": n.spec.name, "port": n.spec.port })),
                 Err(e) => return bad(500, &format!("mining-{s}: {e}")),
             }

@@ -19,6 +19,23 @@ pub struct Marker {
     pub slot: u8,
     /// Sekunden seit 1970
     pub opened_at: u64,
+    /// Aus welcher Vorlage der Dungeon entstand.
+    ///
+    /// Kopiert wird nur einmal, beim Anlegen - bestueckt wird dagegen bei
+    /// jedem Start. Ohne diese Angabe bekaeme ein Dungeon aus einer anderen
+    /// Vorlage beim naechsten Start die Jars der Standardvorlage
+    /// untergeschoben. Aeltere Dungeons haben sie nicht; fuer die gilt die
+    /// Vorgabe aus der Konfiguration.
+    #[serde(default)]
+    pub template: Option<String>,
+    /// Wann er geschlossen wurde, falls er geschlossen ist.
+    ///
+    /// Ein Dungeon laeuft, solange es ihn gibt - Abstuerze und Neustarts des
+    /// Netzwerks eingeschlossen. Geschlossen heisst: er bleibt unten und
+    /// bekommt von hier an noch einmal seine Lebenszeit, bevor er abgeraeumt
+    /// wird. Wer ihn vorher wieder oeffnet, bekommt seine Welt zurueck.
+    #[serde(default)]
+    pub closed_at: Option<u64>,
 }
 
 pub fn name(slot: u8) -> String {
@@ -36,33 +53,148 @@ pub fn now_unix() -> u64 {
         .map_or(0, |d| d.as_secs())
 }
 
-pub fn write_marker(dir: &Path, slot: u8, opened_at: u64) -> io::Result<()> {
-    let m = Marker { slot, opened_at };
+pub fn write_marker(
+    dir: &Path,
+    slot: u8,
+    opened_at: u64,
+    template: Option<&str>,
+) -> io::Result<()> {
+    write(
+        dir,
+        &Marker {
+            slot,
+            opened_at,
+            template: template.map(str::to_string),
+            closed_at: None,
+        },
+    )
+}
+
+fn write(dir: &Path, m: &Marker) -> io::Result<()> {
     fs::write(
         dir.join(MARKER),
-        serde_json::to_vec_pretty(&m).expect("Marker"),
+        serde_json::to_vec_pretty(m).expect("Marker"),
     )
+}
+
+/// Die Markierung, falls sie da und lesbar ist.
+pub fn read_marker(dir: &Path) -> Option<Marker> {
+    serde_json::from_str(&fs::read_to_string(dir.join(MARKER)).ok()?).ok()
+}
+
+/// Merkt an, dass dieser Dungeon geschlossen ist.
+///
+/// Ohne Markierung - ein Dungeon aus alter Zeit - gibt es nichts zu merken;
+/// dann bleibt es beim Anlegedatum, und er laeuft nach seiner urspruenglichen
+/// Zeit ab.
+pub fn mark_closed(dir: &Path, at: u64) -> io::Result<()> {
+    let Some(mut m) = read_marker(dir) else {
+        return Ok(());
+    };
+    m.closed_at = Some(at);
+    write(dir, &m)
+}
+
+/// Nimmt die Schliessung zurueck - der Dungeon ist wieder offen.
+pub fn mark_open(dir: &Path) -> io::Result<()> {
+    match read_marker(dir) {
+        Some(m) if m.closed_at.is_some() => write(
+            dir,
+            &Marker {
+                closed_at: None,
+                ..m
+            },
+        ),
+        _ => Ok(()),
+    }
+}
+
+/// Ist dieser Dungeon geschlossen, und seit wann?
+pub fn closed_at(dir: &Path) -> Option<u64> {
+    read_marker(dir)?.closed_at
+}
+
+/// Ab wann die Uhr fuer das Abraeumen laeuft.
+///
+/// Beim offenen Dungeon ist das der Zeitpunkt des Oeffnens. Beim
+/// geschlossenen der des Schliessens: er bekommt seine Zeit noch einmal, weil
+/// sonst ein Dungeon, den jemand nach 23 Stunden schliesst, eine Stunde
+/// spaeter weg waere - ohne dass jemand damit rechnet.
+pub fn expires_from(dir: &Path) -> Option<u64> {
+    closed_at(dir).or_else(|| opened_at(dir))
+}
+
+/// Aus welcher Vorlage dieser Dungeon entstand, falls bekannt.
+pub fn template_of(dir: &Path) -> Option<String> {
+    read_marker(dir)?.template
+}
+
+/// Welche Vorlagen sich als dynamischer Server starten lassen.
+///
+/// Alles unter templates/ ausser der gemeinsamen Grundlage und den Vorlagen
+/// der festen Server - die gehoeren zu main, build und farm und haben als
+/// Dungeon nichts verloren.
+pub fn templates(templates_dir: &Path, static_names: &[String]) -> Vec<String> {
+    let mut v: Vec<String> = fs::read_dir(templates_dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n != "common" && !static_names.contains(n))
+        .collect();
+    v.sort();
+    v
 }
 
 /// Wann wurde der Dungeon geoeffnet?
 ///
 /// Aus der Markierungsdatei. Fehlt sie - ein Dungeon noch aus der Zeit von
-/// dungeon.ps1 -, aus dem Anlegedatum des Verzeichnisses. Das allein waere
+/// den alten Skripten -, aus dem Anlegedatum des Verzeichnisses. Das waere
 /// unzuverlaessig: NTFS gibt einem Verzeichnis, das binnen 15 Sekunden unter
 /// gleichem Namen neu entsteht, das alte Anlegedatum zurueck ("tunneling").
 /// Ein gerade abgeraeumter und sofort neu geoeffneter Dungeon waere sonst
 /// schon beim Oeffnen abgelaufen.
 pub fn opened_at(dir: &Path) -> Option<u64> {
-    if let Ok(text) = fs::read_to_string(dir.join(MARKER)) {
-        if let Ok(m) = serde_json::from_str::<Marker>(&text) {
-            return Some(m.opened_at);
-        }
+    if let Some(m) = read_marker(dir) {
+        return Some(m.opened_at);
     }
     fs::metadata(dir)
         .and_then(|m| m.created())
         .ok()
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
         .map(|d| d.as_secs())
+}
+
+/// Holt Dungeons aus ihrer alten Ecke.
+///
+/// Frueher lagen sie unter servers/ neben den festen Servern. Wer ein
+/// bestehendes Netzwerk aktualisiert, soll dabei weder seine offenen Dungeons
+/// verlieren noch sie von Hand verschieben muessen - also passiert das einmal
+/// von selbst. Gibt die Namen zurueck, die umgezogen sind.
+///
+/// Was nicht umziehen laesst, weil drueben schon etwas gleichen Namens liegt,
+/// bleibt liegen: lieber ein Verzeichnis zu viel als eine ueberschriebene Welt.
+pub fn migrate(old_dir: &Path, new_dir: &Path) -> Vec<String> {
+    let mut moved = Vec::new();
+    let Ok(entries) = fs::read_dir(old_dir) else {
+        return moved;
+    };
+    for e in entries.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        if parse_name(&name).is_none() || !e.path().is_dir() {
+            continue;
+        }
+        let to = new_dir.join(&name);
+        if to.exists() {
+            continue;
+        }
+        if fs::create_dir_all(new_dir).is_ok() && fs::rename(e.path(), &to).is_ok() {
+            moved.push(name);
+        }
+    }
+    moved.sort();
+    moved
 }
 
 /// Nummern aller vorhandenen Dungeon-Verzeichnisse, aufsteigend.
@@ -79,7 +211,7 @@ pub fn existing(servers_dir: &Path, slots: u8) -> Vec<u8> {
     v
 }
 
-/// Welche Plaetze `mine open` benutzt - dieselbe Regel wie in dungeon.ps1:
+/// Welche Plaetze `mine open` benutzt:
 /// ab `slot` (sonst 1) aufwaerts, laufende werden uebersprungen. Ist ein
 /// Platz ausdruecklich angegeben und laeuft er schon, ist dort Schluss.
 ///
@@ -177,6 +309,63 @@ mod tests {
     }
 
     #[test]
+    fn schliessen_stellt_die_uhr_neu() {
+        let d = &crate::testutil::tempdir("mine-close");
+        write_marker(d, 2, 1_000, Some("mining")).unwrap();
+        assert_eq!(expires_from(d), Some(1_000));
+        assert_eq!(closed_at(d), None);
+
+        // Geschlossen: ab jetzt laeuft die Zeit noch einmal.
+        mark_closed(d, 9_000).unwrap();
+        assert_eq!(closed_at(d), Some(9_000));
+        assert_eq!(expires_from(d), Some(9_000));
+        // Geoeffnet bleibt geoeffnet - die Vorlage ueberlebt beides.
+        assert_eq!(opened_at(d), Some(1_000));
+        assert_eq!(template_of(d).as_deref(), Some("mining"));
+
+        // Wieder geoeffnet: es zaehlt wieder das Oeffnen.
+        mark_open(d).unwrap();
+        assert_eq!(closed_at(d), None);
+        assert_eq!(expires_from(d), Some(1_000));
+    }
+
+    #[test]
+    fn ohne_markierung_gibt_es_nichts_zu_schliessen() {
+        let d = &crate::testutil::tempdir("mine-nomarker");
+        // Kein Fehler, aber auch keine Markierung aus dem Nichts.
+        mark_closed(d, 9_000).unwrap();
+        assert_eq!(closed_at(d), None);
+    }
+
+    #[test]
+    fn dungeons_ziehen_einmal_um() {
+        let root = crate::testutil::tempdir("mine-migrate");
+        let old = root.join("servers");
+        let new = root.join("servers_dynamic");
+        for n in ["mining-1", "mining-4", "main", ".trash"] {
+            fs::create_dir_all(old.join(n)).unwrap();
+        }
+        // Drueben liegt schon einer - der bleibt, wo er ist.
+        fs::create_dir_all(new.join("mining-4")).unwrap();
+        fs::write(new.join("mining-4").join("welt.txt"), "drueben").unwrap();
+        fs::write(old.join("mining-4").join("welt.txt"), "hier").unwrap();
+
+        assert_eq!(migrate(&old, &new), ["mining-1"]);
+        assert!(new.join("mining-1").is_dir());
+        assert!(!old.join("mining-1").exists());
+        // Feste Server bleiben, wo sie sind.
+        assert!(old.join("main").is_dir());
+        assert!(!new.join("main").exists());
+        // Und die vorhandene Welt drueben wurde nicht ueberschrieben.
+        assert_eq!(
+            fs::read_to_string(new.join("mining-4").join("welt.txt")).unwrap(),
+            "drueben"
+        );
+        // Beim zweiten Lauf gibt es nichts mehr zu tun.
+        assert!(migrate(&old, &new).is_empty());
+    }
+
+    #[test]
     fn freie_plaetze_von_unten() {
         let running = |n: u8| n == 1 || n == 3;
         assert_eq!(pick_slots(3, None, 8, running), Ok(vec![2, 4, 5]));
@@ -240,7 +429,7 @@ mod tests {
     #[test]
     fn markierung_schlaegt_verzeichnisdatum() {
         let dir = crate::testutil::tempdir("mine-marker");
-        write_marker(&dir, 4, 12345).unwrap();
+        write_marker(&dir, 4, 12345, None).unwrap();
         assert_eq!(opened_at(&dir), Some(12345));
         fs::remove_file(dir.join(MARKER)).unwrap();
         // ohne Markierung: Anlegedatum, also ungefaehr jetzt

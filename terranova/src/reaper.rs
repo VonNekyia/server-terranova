@@ -19,13 +19,19 @@ pub fn reap(sup: &Arc<Supervisor>, dry_run: bool, stop_running: bool) -> Vec<Str
     let now = mines::now_unix();
     let lifetime = sup.cfg.mines.lifetime.0;
 
-    for slot in mines::existing(&sup.paths.servers(), sup.cfg.mines.slots) {
+    for slot in mines::existing(&sup.paths.dynamic(), sup.cfg.mines.slots) {
         let name = mines::name(slot);
-        let dir = sup.paths.server(&name);
+        let dir = sup.paths.mine(&name);
         let node = sup.node(&name);
         let running = node.as_ref().is_some_and(|n| n.status() != Status::Stopped);
 
-        match mines::reap_decision(mines::opened_at(&dir), now, lifetime, running, stop_running) {
+        match mines::reap_decision(
+            mines::expires_from(&dir),
+            now,
+            lifetime,
+            running,
+            stop_running,
+        ) {
             Reap::Keep { remaining } => {
                 let m = remaining.as_secs() / 60;
                 done.push(format!("{name}: noch {}h{:02}m", m / 60, m % 60));
@@ -61,8 +67,35 @@ pub fn reap(sup: &Arc<Supervisor>, dry_run: bool, stop_running: bool) -> Vec<Str
     done
 }
 
+/// Raeumt einen Dungeon sofort ab, ohne auf seine Zeit zu warten.
+///
+/// Stoppen, verschieben, loeschen - dieselbe Reihenfolge wie beim Ablauf, nur
+/// ohne die Frage nach dem Alter. Wer ihn wegwirft, hat sich das ueberlegt;
+/// die Welt ist danach weg und der Platz frei.
+pub fn reap_one(sup: &Arc<Supervisor>, slot: u8) -> Result<(), String> {
+    let name = mines::name(slot);
+    if !sup.paths.mine(&name).is_dir() {
+        return Err(format!("{name} gibt es nicht"));
+    }
+    if let Some(n) = sup.node(&name) {
+        if n.status() != Status::Stopped {
+            sup.stop_node(&n);
+        }
+    }
+    match delete(sup, &name) {
+        Ok(()) => {
+            sup.log(format!("{name}: abgeraeumt"));
+            Ok(())
+        }
+        Err(e) => {
+            sup.log(format!("{name}: abraeumen fehlgeschlagen: {e}"));
+            Err(e.to_string())
+        }
+    }
+}
+
 fn delete(sup: &Arc<Supervisor>, name: &str) -> std::io::Result<()> {
-    let dir = sup.paths.server(name);
+    let dir = sup.paths.mine(name);
     let trash = sup.paths.trash();
     fs::create_dir_all(&trash)?;
     // Erst umbenennen: haelt noch jemand eine Datei offen, scheitert das
@@ -70,6 +103,9 @@ fn delete(sup: &Arc<Supervisor>, name: &str) -> std::io::Result<()> {
     let grave = trash.join(format!("{name}-{}", mines::now_unix()));
     fs::rename(&dir, &grave)?;
     sup.remove_node(name);
+    // Der Platz ist weg - dann soll auch der Proxy niemanden mehr dorthin
+    // schicken.
+    sup.sync_proxy_servers();
     fs::remove_dir_all(&grave)
 }
 
@@ -86,7 +122,7 @@ mod tests {
     fn verschieben_und_loeschen() {
         let root = crate::testutil::tempdir("reap");
         let paths = Paths::new(&root);
-        let dir = paths.server("mining-2");
+        let dir = paths.mine("mining-2");
         fs::create_dir_all(dir.join("world")).unwrap();
         fs::write(dir.join("world").join("level.dat"), b"welt").unwrap();
 

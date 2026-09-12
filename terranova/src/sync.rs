@@ -4,7 +4,7 @@
 //! Jedes Jar liegt genau einmal im Repository, naemlich unter templates/.
 //! Ein Plugin-Update ist damit eine Datei und kein viermaliges Kopieren.
 //!
-//! Neu gegenueber sync-servers.ps1: was einmal hierher kopiert wurde, steht
+//! Was einmal hierher kopiert wurde, steht
 //! in einer Liste (.terranova-sync.json). Verschwindet ein Jar aus der
 //! Vorlage, wird die Kopie geloescht. Das alte Copy-Item hat nie etwas
 //! entfernt - nach einem Plugin-Update lagen HuskSync-4.0.0.jar und
@@ -21,6 +21,10 @@ use serde::{Deserialize, Serialize};
 use crate::config::{Config, NodeSpec};
 use crate::paths::Paths;
 use crate::{paperyml, props, secrets};
+
+fn exists(p: PathBuf) -> Option<PathBuf> {
+    p.is_file().then_some(p)
+}
 
 /// Liste der Dateien, die eine frueherer Lauf hierher kopiert hat.
 const MANIFEST: &str = ".terranova-sync.json";
@@ -66,14 +70,32 @@ impl<'a> Syncer<'a> {
 
     /// Bestueckt einen Server. Der Proxy hat keine Vorlage und wird
     /// uebersprungen.
+    /// Woraus die server.properties entsteht.
+    ///
+    /// Beim Dungeon aus seiner Vorlage, sonst aus der gemeinsamen. Beim festen
+    /// Server aus seiner eigenen server.properties.dist: die fertige Datei
+    /// daneben traegt das RCON-Passwort und gehoert deshalb nicht ins
+    /// Repository, die Vorlage dazu schon.
+    fn props_source(&self, node: &NodeSpec) -> Option<PathBuf> {
+        let Some(t) = node.template.as_deref() else {
+            return exists(node.dir.join("server.properties.dist"));
+        };
+        exists(self.paths.template(t).join("server.properties"))
+            .or_else(|| exists(self.paths.common().join("server.properties")))
+    }
+
+    /// Dasselbe fuer paper-global.yml - dort steckt das Forwarding-Secret.
+    fn paper_global_source(&self, node: &NodeSpec) -> Option<PathBuf> {
+        if node.template.is_some() {
+            return exists(self.paths.common().join("config").join("paper-global.yml"));
+        }
+        exists(node.dir.join("config").join("paper-global.yml.dist"))
+    }
+
     pub fn sync(&self, node: &NodeSpec, dry_run: bool) -> io::Result<Report> {
         let mut r = Report::default();
-        let Some(template) = node.template.as_deref() else {
-            return Ok(r);
-        };
         let dir = &node.dir;
         let common = self.paths.common();
-        let own = self.paths.template(template);
 
         if !dry_run {
             fs::create_dir_all(dir)?;
@@ -83,70 +105,69 @@ impl<'a> Syncer<'a> {
         // letzten Lauf.
         let mut managed: BTreeSet<String> = BTreeSet::new();
 
-        // --- Paper und die gemeinsamen Configs ------------------------------
-        for src in jars_matching(&common, "paper-") {
-            let rel = file_name(&src);
-            copy_into(&src, dir, &rel, dry_run, &mut r)?;
-            managed.insert(rel);
-        }
-        for name in ["eula.txt", "bukkit.yml", "spigot.yml"] {
-            let src = common.join(name);
-            if src.is_file() {
-                copy_into(&src, dir, name, dry_run, &mut r)?;
-            }
-        }
-        for src in files_with_ext(&common.join("config"), "yml") {
-            // paper-global.yml wird weiter unten erzeugt, nicht kopiert: dort
-            // kommt noch das Forwarding-Secret hinein. Kopieren und danach
-            // hineinschreiben hiesse, die Datei bei jedem Lauf zweimal zu
-            // schreiben - und sie waere nie fertig.
-            if file_name(&src) == "paper-global.yml" {
-                continue;
-            }
-            let rel = format!("config/{}", file_name(&src));
-            copy_into(&src, dir, &rel, dry_run, &mut r)?;
-        }
+        // Bestueckt wird nur, wer aus einer Vorlage kommt - also ein Dungeon.
+        // Ein fester Server traegt sein Paper und seine Plugins selbst; was in
+        // seinem Verzeichnis liegt, ist versioniert und laeuft genau so.
+        if let Some(template) = node.template.as_deref() {
+            let own = self.paths.template(template);
 
-        // --- Plugin-Jars ----------------------------------------------------
-        for src in jars_matching(&common.join("plugins"), "") {
-            let rel = format!("plugins/{}", file_name(&src));
-            copy_into(&src, dir, &rel, dry_run, &mut r)?;
-            managed.insert(rel);
-        }
-        let expansions = common
-            .join("plugins")
-            .join("PlaceholderAPI")
-            .join("expansions");
-        for src in jars_matching(&expansions, "") {
-            let rel = format!("plugins/PlaceholderAPI/expansions/{}", file_name(&src));
-            copy_into(&src, dir, &rel, dry_run, &mut r)?;
-            managed.insert(rel);
-        }
-        // Was nur dieser Server braucht.
-        for src in jars_matching(&own.join("plugins"), "") {
-            let rel = format!("plugins/{}", file_name(&src));
-            copy_into(&src, dir, &rel, dry_run, &mut r)?;
-            managed.insert(rel);
-        }
+            // --- Paper und die gemeinsamen Configs ------------------------------
+            for src in jars_matching(&common, "paper-") {
+                let rel = file_name(&src);
+                copy_into(&src, dir, &rel, dry_run, &mut r)?;
+                managed.insert(rel);
+            }
+            for name in ["eula.txt", "bukkit.yml", "spigot.yml"] {
+                let src = common.join(name);
+                if src.is_file() {
+                    copy_into(&src, dir, name, dry_run, &mut r)?;
+                }
+            }
+            for src in files_with_ext(&common.join("config"), "yml") {
+                // paper-global.yml wird weiter unten erzeugt, nicht kopiert: dort
+                // kommt noch das Forwarding-Secret hinein. Kopieren und danach
+                // hineinschreiben hiesse, die Datei bei jedem Lauf zweimal zu
+                // schreiben - und sie waere nie fertig.
+                if file_name(&src) == "paper-global.yml" {
+                    continue;
+                }
+                let rel = format!("config/{}", file_name(&src));
+                copy_into(&src, dir, &rel, dry_run, &mut r)?;
+            }
 
-        // Die HuskSync-Config nur anlegen, wenn noch keine da ist: eine
-        // bestehende koennte von Hand angepasst sein.
-        let hs_src = common.join("plugins").join("HuskSync").join("config.yml");
-        let hs_dst = dir.join("plugins").join("HuskSync").join("config.yml");
-        if hs_src.is_file() && !hs_dst.exists() {
-            copy_into(&hs_src, dir, "plugins/HuskSync/config.yml", dry_run, &mut r)?;
+            // --- Plugin-Jars ----------------------------------------------------
+            for src in jars_matching(&common.join("plugins"), "") {
+                let rel = format!("plugins/{}", file_name(&src));
+                copy_into(&src, dir, &rel, dry_run, &mut r)?;
+                managed.insert(rel);
+            }
+            let expansions = common
+                .join("plugins")
+                .join("PlaceholderAPI")
+                .join("expansions");
+            for src in jars_matching(&expansions, "") {
+                let rel = format!("plugins/PlaceholderAPI/expansions/{}", file_name(&src));
+                copy_into(&src, dir, &rel, dry_run, &mut r)?;
+                managed.insert(rel);
+            }
+            // Was nur dieser Server braucht.
+            for src in jars_matching(&own.join("plugins"), "") {
+                let rel = format!("plugins/{}", file_name(&src));
+                copy_into(&src, dir, &rel, dry_run, &mut r)?;
+                managed.insert(rel);
+            }
+
+            // Die HuskSync-Config nur anlegen, wenn noch keine da ist: eine
+            // bestehende koennte von Hand angepasst sein.
+            let hs_src = common.join("plugins").join("HuskSync").join("config.yml");
+            let hs_dst = dir.join("plugins").join("HuskSync").join("config.yml");
+            if hs_src.is_file() && !hs_dst.exists() {
+                copy_into(&hs_src, dir, "plugins/HuskSync/config.yml", dry_run, &mut r)?;
+            }
         }
 
         // --- server.properties ----------------------------------------------
-        let tpl_props = {
-            let own_props = own.join("server.properties");
-            if own_props.is_file() {
-                own_props
-            } else {
-                common.join("server.properties")
-            }
-        };
-        if tpl_props.is_file() {
+        if let Some(tpl_props) = self.props_source(node) {
             let want = props::wants(
                 node.port,
                 node.rcon_port.unwrap_or(node.port),
@@ -158,17 +179,26 @@ impl<'a> Syncer<'a> {
         }
 
         // --- paper-global.yml samt Velocity-Weiterleitung -----------------------
-        // Quelle ist immer die Vorlage: die Fassung im Serververzeichnis ist
-        // abgeleitet und in .gitignore. Wer etwas dauerhaft aendern will,
-        // aendert templates/common/config/paper-global.yml.
-        let pg_src = common.join("config").join("paper-global.yml");
-        if pg_src.is_file() {
+        // Die Fassung im Serververzeichnis ist abgeleitet und in .gitignore -
+        // sie traegt das Forwarding-Secret. Geaendert wird die Quelle.
+        if let Some(pg_src) = self.paper_global_source(node) {
             let injected = paperyml::inject(&fs::read_to_string(&pg_src)?, &self.forwarding_secret);
             let pg = dir.join("config").join("paper-global.yml");
             r.paper_global = write_if_changed(&pg, &injected, dry_run)?;
         }
 
         // --- Aufraeumen: was frueher von hier kam und jetzt nicht mehr ---------
+        // Nur fuer Bestuecktes: ohne Vorlage gibt es keine Kopien, die
+        // veralten koennten - und ein leeres Verzeichnis wuerde sonst das
+        // ganze Serververzeichnis leerraeumen. Ein Manifest aus der Zeit, als
+        // auch feste Server bestueckt wurden, kann dann weg.
+        if node.template.is_none() {
+            let alt = dir.join(MANIFEST);
+            if alt.is_file() && !dry_run {
+                let _ = fs::remove_file(&alt);
+            }
+            return Ok(r);
+        }
         let manifest_path = dir.join(MANIFEST);
         let previous: Manifest = fs::read_to_string(&manifest_path)
             .ok()
@@ -331,9 +361,23 @@ mod tests {
         )
         .unwrap();
 
-        let own = root.join("templates").join("main");
-        fs::create_dir_all(own.join("plugins")).unwrap();
-        fs::write(own.join("plugins").join("Nations-1.0.0.jar"), b"nations").unwrap();
+        // Ein fester Server bringt alles selbst mit. Bestueckt wird er nicht -
+        // gelesen werden nur seine beiden Quellen mit den Geheimnissen.
+        let main = root.join("servers").join("main");
+        fs::create_dir_all(main.join("config")).unwrap();
+        fs::create_dir_all(main.join("plugins")).unwrap();
+        fs::write(main.join("paper-26.2-123.jar"), b"paper").unwrap();
+        fs::write(main.join("plugins").join("Nations-1.0.0.jar"), b"nations").unwrap();
+        fs::write(
+            main.join("server.properties.dist"),
+            "motd=Terranova\nserver-port=25565\n",
+        )
+        .unwrap();
+        fs::write(
+            main.join("config").join("paper-global.yml.dist"),
+            "proxies:\n  velocity:\n    enabled: false\n    online-mode: true\n    secret: ''\n",
+        )
+        .unwrap();
 
         let mine = root.join("templates").join("mining");
         fs::create_dir_all(mine.join("plugins")).unwrap();
@@ -349,13 +393,13 @@ mod tests {
     }
 
     #[test]
-    fn bestueckt_einen_server_vollstaendig() {
+    fn bestueckt_einen_dungeon_vollstaendig() {
         let (root, cfg, paths) = fixture("sync-full");
         let s = Syncer::new(&paths, &cfg).unwrap();
-        let main = cfg.node(&paths, "main").unwrap();
-        let r = s.sync(&main, false).unwrap();
+        let mine = cfg.node(&paths, "mining-3").unwrap();
+        let r = s.sync(&mine, false).unwrap();
 
-        let dir = root.join("servers").join("main");
+        let dir = root.join("servers_dynamic").join("mining-3");
         for f in [
             "paper-26.2-123.jar",
             "eula.txt",
@@ -363,7 +407,7 @@ mod tests {
             "spigot.yml",
             "config/paper-global.yml",
             "plugins/LuckPerms-5.5.81.jar",
-            "plugins/Nations-1.0.0.jar",
+            "plugins/BountyfulMining-1.0.0.jar",
             "plugins/PlaceholderAPI/expansions/Expansion-player.jar",
             "plugins/HuskSync/config.yml",
             "server.properties",
@@ -378,7 +422,7 @@ mod tests {
 
         // Port und RCON stehen drin, das Secret ebenfalls
         let p = fs::read_to_string(dir.join("server.properties")).unwrap();
-        assert!(p.contains("server-port=25566") && p.contains("rcon.port=25666"));
+        assert!(p.contains("server-port=25573") && p.contains("rcon.port=25673"));
         assert!(p.contains("enable-rcon=true") && p.contains("server-ip=127.0.0.1"));
         let pg = fs::read_to_string(dir.join("config").join("paper-global.yml")).unwrap();
         assert!(pg.contains("enabled: true") && !pg.contains("secret: ''"));
@@ -388,9 +432,9 @@ mod tests {
     fn zweiter_lauf_kopiert_nichts_mehr() {
         let (_root, cfg, paths) = fixture("sync-idempotent");
         let s = Syncer::new(&paths, &cfg).unwrap();
-        let main = cfg.node(&paths, "main").unwrap();
-        s.sync(&main, false).unwrap();
-        let again = s.sync(&main, false).unwrap();
+        let mine = cfg.node(&paths, "mining-3").unwrap();
+        s.sync(&mine, false).unwrap();
+        let again = s.sync(&mine, false).unwrap();
         assert!(again.nothing_to_do(), "{again:?}");
     }
 
@@ -398,16 +442,16 @@ mod tests {
     fn altes_jar_verschwindet_nach_einem_update() {
         let (root, cfg, paths) = fixture("sync-prune");
         let s = Syncer::new(&paths, &cfg).unwrap();
-        let main = cfg.node(&paths, "main").unwrap();
-        s.sync(&main, false).unwrap();
+        let mine = cfg.node(&paths, "mining-3").unwrap();
+        s.sync(&mine, false).unwrap();
 
         // Plugin-Update in der Vorlage
         let plugins = root.join("templates").join("common").join("plugins");
         fs::remove_file(plugins.join("LuckPerms-5.5.81.jar")).unwrap();
         fs::write(plugins.join("LuckPerms-5.6.0.jar"), b"lp neu").unwrap();
 
-        let r = s.sync(&main, false).unwrap();
-        let dir = root.join("servers").join("main");
+        let r = s.sync(&mine, false).unwrap();
+        let dir = root.join("servers_dynamic").join("mining-3");
         assert_eq!(r.pruned, ["plugins/LuckPerms-5.5.81.jar"]);
         assert!(!dir.join("plugins").join("LuckPerms-5.5.81.jar").exists());
         assert!(dir.join("plugins").join("LuckPerms-5.6.0.jar").is_file());
@@ -417,11 +461,11 @@ mod tests {
     fn fremde_dateien_bleiben_unangetastet() {
         let (root, cfg, paths) = fixture("sync-foreign");
         let s = Syncer::new(&paths, &cfg).unwrap();
-        let main = cfg.node(&paths, "main").unwrap();
-        s.sync(&main, false).unwrap();
+        let mine = cfg.node(&paths, "mining-3").unwrap();
+        s.sync(&mine, false).unwrap();
 
         // Von Hand hingelegt und eine Plugin-Config - nichts davon gehoert uns.
-        let dir = root.join("servers").join("main");
+        let dir = root.join("servers_dynamic").join("mining-3");
         fs::write(dir.join("plugins").join("VonHand.jar"), b"x").unwrap();
         fs::create_dir_all(dir.join("plugins").join("Nations")).unwrap();
         fs::write(
@@ -430,7 +474,7 @@ mod tests {
         )
         .unwrap();
 
-        s.sync(&main, false).unwrap();
+        s.sync(&mine, false).unwrap();
         assert!(dir.join("plugins").join("VonHand.jar").is_file());
         assert!(dir
             .join("plugins")
@@ -443,16 +487,16 @@ mod tests {
     fn husksync_config_wird_nicht_ueberschrieben() {
         let (root, cfg, paths) = fixture("sync-husksync");
         let s = Syncer::new(&paths, &cfg).unwrap();
-        let main = cfg.node(&paths, "main").unwrap();
-        s.sync(&main, false).unwrap();
+        let mine = cfg.node(&paths, "mining-3").unwrap();
+        s.sync(&mine, false).unwrap();
         let hs = root
-            .join("servers")
-            .join("main")
+            .join("servers_dynamic")
+            .join("mining-3")
             .join("plugins")
             .join("HuskSync")
             .join("config.yml");
         fs::write(&hs, "von hand angepasst\n").unwrap();
-        s.sync(&main, false).unwrap();
+        s.sync(&mine, false).unwrap();
         assert_eq!(fs::read_to_string(&hs).unwrap(), "von hand angepasst\n");
     }
 
@@ -462,7 +506,7 @@ mod tests {
         let s = Syncer::new(&paths, &cfg).unwrap();
         let mine = cfg.node(&paths, "mining-3").unwrap();
         s.sync(&mine, false).unwrap();
-        let dir = root.join("servers").join("mining-3");
+        let dir = root.join("servers_dynamic").join("mining-3");
         let p = fs::read_to_string(dir.join("server.properties")).unwrap();
         assert!(p.contains("motd=Terranova Mine 3"), "{p}");
         assert!(p.contains("server-port=25573") && p.contains("rcon.port=25673"));
@@ -478,10 +522,42 @@ mod tests {
     fn probelauf_schreibt_nichts() {
         let (root, cfg, paths) = fixture("sync-dry");
         let s = Syncer::new(&paths, &cfg).unwrap();
-        let main = cfg.node(&paths, "main").unwrap();
-        let r = s.sync(&main, true).unwrap();
+        let mine = cfg.node(&paths, "mining-3").unwrap();
+        let r = s.sync(&mine, true).unwrap();
         assert!(!r.copied.is_empty() && r.props);
-        assert!(!root.join("servers").join("main").exists());
+        assert!(!root.join("servers_dynamic").join("mining-3").exists());
+    }
+
+    #[test]
+    fn fester_server_wird_nur_eingerichtet() {
+        let (root, cfg, paths) = fixture("sync-static");
+        let s = Syncer::new(&paths, &cfg).unwrap();
+        let main = cfg.node(&paths, "main").unwrap();
+        let r = s.sync(&main, false).unwrap();
+
+        // Nichts kopiert - was er braucht, liegt schon da.
+        assert!(r.copied.is_empty(), "{r:?}");
+        assert!(r.props && r.paper_global);
+
+        let dir = root.join("servers").join("main");
+        // Die gemeinsame Vorlage hat ihn nicht angefasst.
+        assert!(!dir.join("plugins").join("LuckPerms-5.5.81.jar").exists());
+        assert!(!dir.join("bukkit.yml").exists());
+        // Sein eigenes bleibt liegen.
+        assert!(dir.join("plugins").join("Nations-1.0.0.jar").is_file());
+
+        // Port, RCON und das Secret stehen trotzdem drin - die entstehen hier.
+        let p = fs::read_to_string(dir.join("server.properties")).unwrap();
+        assert!(
+            p.contains("server-port=25566") && p.contains("rcon.port=25666"),
+            "{p}"
+        );
+        let pg = fs::read_to_string(dir.join("config").join("paper-global.yml")).unwrap();
+        assert!(pg.contains("enabled: true"), "{pg}");
+        assert!(!pg.contains("secret: ''"), "{pg}");
+
+        // Und beim zweiten Lauf gibt es nichts mehr zu tun.
+        assert!(s.sync(&main, false).unwrap().nothing_to_do());
     }
 
     #[test]

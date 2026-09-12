@@ -28,7 +28,9 @@ pub fn run(sup: Arc<Supervisor>) {
         let every = sup.cfg.schedule.reap_every.0;
         if !every.is_zero() && last_reap.elapsed() >= every {
             last_reap = Instant::now();
-            for line in reaper::reap(&sup, false, false) {
+            // stop_running: ein Dungeon laeuft, solange es ihn gibt - wer
+            // hier den laufenden ueberspringt, raeumt nie einen ab.
+            for line in reaper::reap(&sup, false, true) {
                 // Nur das Abraeumen selbst ist eine Meldung wert, nicht jeder
                 // Dungeon, der noch Zeit hat.
                 if line.contains("geloescht") {

@@ -31,7 +31,7 @@ use crate::backend::{self, Backend, Native};
 use crate::config::{Config, NodeKind, NodeSpec, Runtime};
 use crate::console::{Kind, LineRing};
 use crate::paths::Paths;
-use crate::{deps, mines, rcon, secrets, sync, sys};
+use crate::{config, deps, mines, rcon, secrets, sync, sys, velocity};
 
 /// So viele Zeilen Konsole haelt jeder Knoten vor.
 const CONSOLE_LINES: usize = 2000;
@@ -202,6 +202,11 @@ impl Supervisor {
                 Box::new(d)
             }
         };
+        // Einmalig: Dungeons aus der Zeit, als sie noch unter servers/ lagen.
+        for name in mines::migrate(&paths.servers(), &paths.dynamic()) {
+            eprintln!("[terranova] {name} nach servers_dynamic/ verschoben");
+        }
+
         let (rcon_password, _) = secrets::load_or_create(&paths.rcon_secret())?;
         fs::create_dir_all(paths.state_dir())?;
         let log_file = fs::OpenOptions::new()
@@ -237,7 +242,7 @@ impl Supervisor {
         for spec in self.cfg.server_nodes(&self.paths) {
             n.insert(spec.name.clone(), Node::new(spec));
         }
-        for slot in mines::existing(&self.paths.servers(), self.cfg.mines.slots) {
+        for slot in mines::existing(&self.paths.dynamic(), self.cfg.mines.slots) {
             let spec = self.cfg.mine_node(&self.paths, slot);
             n.insert(spec.name.clone(), Node::new(spec));
         }
@@ -616,6 +621,10 @@ impl Supervisor {
         // ueberhaupt laden koennten.
         self.start_deps()?;
 
+        // Was es an Dungeons gibt, gehoert in velocity.toml, bevor der Proxy
+        // die Datei liest.
+        self.sync_proxy_servers();
+
         // Bestuecken, dann starten. Ein laufender Server haelt seine Jars
         // offen, deshalb passiert das vorher.
         let syncer = sync::Syncer::new(&self.paths, &self.cfg)
@@ -634,11 +643,16 @@ impl Supervisor {
 
         // Offene Dungeons wieder hochfahren, solange sie nicht abgelaufen sind.
         if self.cfg.mines.resume && only.is_empty() {
-            for slot in mines::existing(&self.paths.servers(), self.cfg.mines.slots) {
-                let dir = self.paths.server(&mines::name(slot));
+            for slot in mines::existing(&self.paths.dynamic(), self.cfg.mines.slots) {
+                let dir = self.paths.mine(&mines::name(slot));
+                // Geschlossen heisst geschlossen - der wartet nur noch aufs
+                // Abraeumen.
+                if mines::closed_at(&dir).is_some() {
+                    continue;
+                }
                 let age_ok = matches!(
                     mines::reap_decision(
-                        mines::opened_at(&dir),
+                        mines::expires_from(&dir),
                         mines::now_unix(),
                         self.cfg.mines.lifetime.0,
                         false,
@@ -655,13 +669,13 @@ impl Supervisor {
         }
 
         for node in &to_start {
-            if node.spec.template.is_some() {
-                if let Err(e) = syncer.sync(&node.spec, false) {
-                    self.log(format!(
-                        "{}: Bestuecken fehlgeschlagen: {e}",
-                        node.spec.name
-                    ));
-                }
+            // Auch ohne Vorlage: server.properties und paper-global.yml
+            // entstehen hier, und in beiden steckt ein Geheimnis.
+            if let Err(e) = syncer.sync(&node.spec, false) {
+                self.log(format!(
+                    "{}: Einrichten fehlgeschlagen: {e}",
+                    node.spec.name
+                ));
             }
             if let Err(e) = self.start_node(node) {
                 self.log(format!("{}: Start fehlgeschlagen: {e}", node.spec.name));
@@ -724,6 +738,9 @@ impl Supervisor {
     pub fn start_deps(self: &Arc<Self>) -> io::Result<()> {
         let mut log = |m: &str| self.log(m);
         if self.cfg.runtime() == Runtime::Native {
+            // Zuerst: ohne Java startet hinterher kein einziger Server, und
+            // dann haette MariaDB umsonst gewartet.
+            deps::ensure_java(&self.paths, &self.cfg, &mut log)?;
             deps::ensure_mariadb(&self.paths, &self.cfg, &mut log)?;
             deps::ensure_redis(&self.paths, &self.cfg, &mut log)?;
         } else {
@@ -831,15 +848,39 @@ impl Supervisor {
     // --- Dungeons -------------------------------------------------------------------
 
     /// Legt einen Dungeon an, falls noetig, und startet ihn.
-    pub fn open_mine(self: &Arc<Self>, slot: u8) -> io::Result<Arc<Node>> {
-        let spec = self.cfg.mine_node(&self.paths, slot);
-        let dir = spec.dir.clone();
+    /// Oeffnet einen Dungeon. `template` waehlt die Vorlage; ohne Angabe die
+    /// aus der Konfiguration.
+    ///
+    /// Die Vorlage zaehlt nur beim Anlegen - ein vorhandener Dungeon behaelt
+    /// seine Welt und wird weiter aus der Vorlage bestueckt, aus der er
+    /// entstanden ist.
+    pub fn open_mine(self: &Arc<Self>, slot: u8, template: Option<&str>) -> io::Result<Arc<Node>> {
+        let dir = self.paths.mine(&mines::name(slot));
         if !dir.exists() {
-            let template = self.paths.template(&self.cfg.mines.template);
-            copy_tree(&template, &dir)?;
-            mines::write_marker(&dir, slot, mines::now_unix())?;
-            self.log(format!("{}: aus der Vorlage angelegt", spec.name));
+            let chosen = template.unwrap_or(&self.cfg.mines.template);
+            let from = self.paths.template(chosen);
+            if !from.is_dir() {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("keine Vorlage templates/{chosen}"),
+                ));
+            }
+            copy_tree(&from, &dir)?;
+            mines::write_marker(&dir, slot, mines::now_unix(), Some(chosen))?;
+            self.log(format!(
+                "{}: aus der Vorlage {chosen} angelegt",
+                mines::name(slot)
+            ));
         }
+        // War er geschlossen, ist er es jetzt nicht mehr: seine Welt kommt
+        // zurueck, und die Uhr laeuft wieder auf das urspruengliche Ende zu.
+        if mines::closed_at(&dir).is_some() {
+            mines::mark_open(&dir)?;
+            self.log(format!("{}: wieder geoeffnet", mines::name(slot)));
+        }
+
+        // Erst jetzt: der Bauplan liest die Vorlage aus der Markierung.
+        let spec = self.cfg.mine_node(&self.paths, slot);
         let node = {
             let mut n = self.nodes.lock().unwrap();
             n.entry(spec.name.clone())
@@ -849,6 +890,9 @@ impl Supervisor {
         let syncer = sync::Syncer::new(&self.paths, &self.cfg)
             .map_err(|e| io::Error::other(e.to_string()))?;
         syncer.sync(&node.spec, false)?;
+        // Vor dem Start: sonst stuende der Server schon bereit, waehrend der
+        // Proxy ihn noch nicht kennt.
+        self.sync_proxy_servers();
         self.start_node(&node)?;
         self.save_state();
         Ok(node)
@@ -862,21 +906,96 @@ impl Supervisor {
     /// denken muss.
     pub fn restart_node(self: &Arc<Self>, node: &Arc<Node>) {
         self.stop_node(node);
-        if node.spec.template.is_some() {
-            match sync::Syncer::new(&self.paths, &self.cfg).and_then(|s| s.sync(&node.spec, false))
-            {
-                Ok(r) if !r.pruned.is_empty() => self.log(format!(
-                    "{}: {} veraltete Datei(en) entfernt",
-                    node.spec.name,
-                    r.pruned.len()
-                )),
-                Ok(_) => {}
-                Err(e) => self.log(format!("{}: Bestuecken: {e}", node.spec.name)),
-            }
+        match sync::Syncer::new(&self.paths, &self.cfg).and_then(|s| s.sync(&node.spec, false)) {
+            Ok(r) if !r.pruned.is_empty() => self.log(format!(
+                "{}: {} veraltete Datei(en) entfernt",
+                node.spec.name,
+                r.pruned.len()
+            )),
+            Ok(_) => {}
+            Err(e) => self.log(format!("{}: Einrichten: {e}", node.spec.name)),
         }
         if let Err(e) = self.start_node(node) {
             self.log(format!("{}: Start fehlgeschlagen: {e}", node.spec.name));
         }
+    }
+
+    /// Traegt die offenen Dungeons in velocity.toml ein und laesst den Proxy
+    /// neu laden.
+    ///
+    /// Vorher standen alle acht Plaetze fest in der Datei, ob offen oder
+    /// nicht. Jetzt steht dort, was es wirklich gibt - wer die Zahl der
+    /// Plaetze in terranova.yml aendert, muss nichts mehr nachziehen.
+    ///
+    /// Aendert sich am Inhalt nichts, wird weder geschrieben noch neu
+    /// geladen: ein Neuladen bei jedem Anlass waere ein Grund, es sein zu
+    /// lassen.
+    pub fn sync_proxy_servers(&self) {
+        let file = self
+            .paths
+            .resolve(&self.cfg.proxy.dir)
+            .join("velocity.toml");
+        let text = match fs::read_to_string(&file) {
+            Ok(t) => t,
+            Err(e) => {
+                self.log(format!("velocity.toml: {e}"));
+                return;
+            }
+        };
+        let open: Vec<(String, u16)> = mines::existing(&self.paths.dynamic(), self.cfg.mines.slots)
+            .into_iter()
+            // Ein geschlossener Dungeon kommt nicht wieder hoch - dann soll der
+            // Proxy auch niemanden mehr dorthin schicken.
+            .filter(|slot| mines::closed_at(&self.paths.mine(&mines::name(*slot))).is_none())
+            .map(|slot| {
+                (
+                    mines::name(slot),
+                    self.cfg.mines.base_port + u16::from(slot),
+                )
+            })
+            .collect();
+        let Some(new) = velocity::with_mines(&text, &open) else {
+            return;
+        };
+        if let Err(e) = fs::write(&file, new) {
+            self.log(format!("velocity.toml schreiben: {e}"));
+            return;
+        }
+
+        // Der Proxy liest die Datei nur beim Start und auf Zuruf. Laeuft er
+        // nicht, genuegt die geschriebene Datei - er liest sie ohnehin gleich.
+        let Some(proxy) = self.node(config::PROXY) else {
+            return;
+        };
+        if proxy.status() != Status::Ready {
+            return;
+        }
+        match self.send_command(&proxy, "velocity reload") {
+            Ok(_) => self.log(format!(
+                "Proxy neu geladen - {} Dungeon(s) eingetragen",
+                open.len()
+            )),
+            Err(e) => self.log(format!("Proxy neu laden: {e}")),
+        }
+    }
+
+    /// Schliesst einen Dungeon: stoppen und zum Abraeumen vormerken.
+    ///
+    /// Die Welt bleibt stehen - wer ihn binnen seiner Lebenszeit wieder
+    /// oeffnet, bekommt sie zurueck. Passiert das nicht, raeumt der Reaper ihn
+    /// ab, gerechnet ab jetzt und nicht ab dem Oeffnen: ein Dungeon, den
+    /// jemand nach dreiundzwanzig Stunden schliesst, soll nicht eine Stunde
+    /// spaeter verschwinden.
+    pub fn close_mine(self: &Arc<Self>, slot: u8) -> bool {
+        let Some(node) = self.node(&mines::name(slot)) else {
+            return false;
+        };
+        let ok = self.stop_node(&node);
+        if let Err(e) = mines::mark_closed(&node.spec.dir, mines::now_unix()) {
+            self.log(format!("{}: Markierung schreiben: {e}", node.spec.name));
+        }
+        self.sync_proxy_servers();
+        ok
     }
 
     /// Nimmt einen Knoten aus der Liste - fuer einen abgeraeumten Dungeon.

@@ -68,6 +68,24 @@ pub struct Java {
     pub flags: JavaFlags,
     #[serde(default)]
     pub extra: Vec<String>,
+    /// Welche Java-Hauptversion die Server mindestens brauchen. Paper
+    /// schreibt sie in sein Jar (version.json -> java_version).
+    #[serde(default = "default_java_version")]
+    pub version: u32,
+    /// Was nachgeladen wird, wenn kein passendes Java da ist.
+    #[serde(default)]
+    pub download: Option<JavaDownload>,
+}
+
+/// Ein festgenageltes Temurin-JRE: welcher Build, und je Plattform die
+/// Pruefsumme des Archivs.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct JavaDownload {
+    /// So, wie Adoptium ihn nennt, etwa "jdk-25.0.4.1+1"
+    pub release: String,
+    /// "windows-x64", "linux-x64", "linux-aarch64" -> sha256
+    pub sha256: BTreeMap<String, String>,
 }
 
 impl Default for Java {
@@ -77,6 +95,8 @@ impl Default for Java {
             image: default_java_image(),
             flags: JavaFlags::default(),
             extra: Vec::new(),
+            version: default_java_version(),
+            download: None,
         }
     }
 }
@@ -161,7 +181,11 @@ pub struct Mines {
     pub lifetime: Dur,
     #[serde(default = "default_mine_motd")]
     pub motd: String,
-    /// Offene Dungeons nach einem Netzwerk-Neustart wieder hochfahren
+    /// Offene Dungeons nach einem Netzwerk-Neustart wieder hochfahren.
+    ///
+    /// An, solange nichts anderes dasteht: ein Dungeon existiert nur, weil
+    /// jemand ihn geoeffnet hat - dann soll er auch laufen. Von selbst
+    /// angelegt wird trotzdem keiner. Geschlossene bleiben unten.
     #[serde(default = "default_true")]
     pub resume: bool,
     #[serde(default)]
@@ -325,6 +349,9 @@ fn default_java_path() -> String {
 }
 fn default_java_image() -> String {
     "eclipse-temurin:25-jre".into()
+}
+fn default_java_version() -> u32 {
+    25
 }
 fn default_proxy_dir() -> PathBuf {
     PathBuf::from("proxy")
@@ -564,7 +591,11 @@ impl Config {
                 name: name.clone(),
                 kind: NodeKind::Server,
                 dir: paths.server(name),
-                template: Some(name.clone()),
+                // Ein fester Server wird nicht bestueckt: was in seinem
+                // Verzeichnis liegt, ist was laeuft, und es ist versioniert.
+                // Nur seine server.properties und paper-global.yml entstehen
+                // beim Start neu - da gehoeren Geheimnisse hinein.
+                template: None,
                 port: s.port,
                 rcon_port: Some(self.rcon_port(s.port)),
                 memory: s.memory,
@@ -579,11 +610,17 @@ impl Config {
     pub fn mine_node(&self, paths: &Paths, slot: u8) -> NodeSpec {
         let name = crate::mines::name(slot);
         let port = self.mines.base_port + u16::from(slot);
+        let dir = paths.mine(&name);
+        // Bestueckt wird aus der Vorlage, aus der er auch entstanden ist -
+        // die steht in seiner Markierung, sobald beim Oeffnen eine andere
+        // gewaehlt wurde. Ohne Markierung gilt die Vorgabe.
+        let template =
+            crate::mines::template_of(&dir).unwrap_or_else(|| self.mines.template.clone());
         NodeSpec {
-            dir: paths.server(&name),
+            dir,
             name,
             kind: NodeKind::Mine(slot),
-            template: Some(self.mines.template.clone()),
+            template: Some(template),
             port,
             rcon_port: Some(self.rcon_port(port)),
             memory: self.mines.memory,
@@ -741,7 +778,7 @@ mod tests {
             ("mining-3", 25573, Some(25673))
         );
         assert_eq!(m.motd.as_deref(), Some("Terranova Mine 3"));
-        assert_eq!(m.dir, p.root.join("servers").join("mining-3"));
+        assert_eq!(m.dir, p.root.join("servers_dynamic").join("mining-3"));
         assert!(c.node(&p, "mining-9").is_none(), "nur 8 Plaetze");
         assert!(c.node(&p, "proxy").unwrap().is_proxy());
     }

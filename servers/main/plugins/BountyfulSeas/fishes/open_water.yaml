@@ -1,0 +1,66 @@
+# Hochseeraeuber - Open-water hunters that never stop moving.
+
+# Makrele — Scomber scombrus
+# Rekordlänge (TL): etwa 60 cm — Quelle: FishBase Species Summary, Scomber scombrus
+# Lebensraum: pelagischer Nordatlantik und angrenzende Meere, oft in großen Schwärmen
+# Wassertiefe: 0–1000 m, meist oberhalb 200 m | Temperatur: gemäßigt | Aktivität: Tag und Nacht
+atlantic_mackerel:
+  lore:
+    - "Blaugrüne Blitze rasen durch das offene Wasser."
+  fish_name: "<gray>Makrele</gray>"
+  fish_item: "nexo:atlantic_mackerel"
+
+  max_length: 61
+  level: 2
+
+  water_type: [ocean]
+  vegetation: [temperate]
+  modifier: [swarm]
+
+  spawn_weight: 130
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 4
+
+# Blauflossen-Thunfisch — Thunnus thynnus
+# Rekordlänge (TL): 458 cm — Quelle: FishBase Species Summary, Thunnus thynnus
+# Lebensraum: offener Atlantik und Mittelmeer; hochgradig wandernder Hochseefisch
+# Wassertiefe: Oberfläche bis mehrere hundert Meter | Temperatur: etwa 3–30 °C | Aktivität: Tag und Nacht
+atlantic_bluefin_tuna:
+  lore:
+    - "Ein lebender Torpedo, geschaffen für endlose Ozeane."
+  fish_name: "<gradient:#3b82f6:#f59e0b>Blauflossen-Thunfisch</gradient>"
+  fish_item: "nexo:atlantic_bluefin_tuna"
+
+  max_length: 459
+  level: 23
+
+  water_type: [ocean]
+
+  spawn_weight: 5
+  rarity: "legendary"
+
+  on_eat:
+    saturation: 7
+
+# Schwertfisch — Xiphias gladius
+# Rekordlänge (TL): etwa 455 cm — Quelle: FishBase Species Summary, Xiphias gladius
+# Lebensraum: offene tropische bis gemäßigte Ozeane; stark wandernd
+# Wassertiefe: 0–2878 m, meist oberhalb 550 m | Temperatur: 5–27 °C | Aktivität: Tag und Nacht
+swordfish:
+  lore:
+    - "Eine dunkle Klinge durchschneidet das endlose Blau."
+  fish_name: "<gradient:#60a5fa:#fbbf24>Schwertfisch</gradient>"
+  fish_item: "nexo:swordfish"
+
+  max_length: 456
+  level: 24
+
+  water_type: [ocean]
+
+  spawn_weight: 4
+  rarity: "legendary"
+
+  on_eat:
+    saturation: 7

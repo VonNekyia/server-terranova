@@ -2,6 +2,9 @@
 
 use std::fmt::Write as _;
 use std::fs;
+use std::net::ToSocketAddrs as _;
+// Nur noch fuer die geplante Windows-Aufgabe; Java fragt deps ab.
+#[cfg(windows)]
 use std::process::{Command, Stdio};
 
 use crate::config::{Config, Runtime};
@@ -50,13 +53,24 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
 
     // --- Java ---------------------------------------------------------------
     if cfg.runtime() == Runtime::Native {
-        let java = std::env::var("TERRANOVA_JAVA").unwrap_or_else(|_| cfg.java.path.clone());
-        match java_version(&java) {
-            Some(v) => add(Level::Ok, "Java", format!("{java}: {v}")),
-            None => add(
+        use crate::deps::JavaSource;
+        let want = cfg.java.version;
+        let (java, source) = crate::deps::resolve_java(paths, &cfg.java);
+        let line = crate::deps::java_version_line(&java).unwrap_or_default();
+        let shown = java.display();
+        match source {
+            JavaSource::Env => add(Level::Ok, "Java", format!("TERRANOVA_JAVA {shown}: {line}")),
+            JavaSource::Configured => add(Level::Ok, "Java", format!("{shown}: {line}")),
+            JavaSource::Bundled => add(Level::Ok, "Java", format!("nachgeladen, {shown}: {line}")),
+            JavaSource::Missing if cfg.java.download.is_some() => add(
+                Level::Warn,
+                "Java",
+                format!("kein Java {want} gefunden - der naechste Start laedt Temurin {want} nach (ca. 60 MB)"),
+            ),
+            JavaSource::Missing => add(
                 Level::Fail,
                 "Java",
-                format!("'{java}' laesst sich nicht ausfuehren - installieren oder TERRANOVA_JAVA setzen"),
+                format!("kein Java {want} gefunden - installieren oder TERRANOVA_JAVA setzen"),
             ),
         }
     }
@@ -102,15 +116,54 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
             );
         }
     }
+    // Ein fester Server hat keine Vorlage: er traegt sein Paper und seine
+    // Plugins selbst, versioniert unter servers/<name>/. Geprueft wird
+    // deshalb, ob das auch wirklich dort liegt - und ob die beiden Quellen da
+    // sind, aus denen beim Start die Dateien mit den Geheimnissen entstehen.
+    let mut feste_ok = Vec::new();
     for name in cfg.servers.keys() {
-        let t = paths.template(name);
-        if !t.is_dir() {
+        let dir = paths.server(name);
+        let mut ok = true;
+        let has_paper = fs::read_dir(&dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .any(|n| n.starts_with("paper-") && n.ends_with(".jar"));
+        if !has_paper {
             add(
-                Level::Warn,
-                "Vorlagen",
-                format!("templates/{name}/ fehlt - der Server bekommt die gemeinsame Vorlage"),
+                Level::Fail,
+                "Fester Server",
+                format!("kein paper-*.jar in servers/{name}/ - ohne es startet er nicht"),
             );
+            ok = false;
         }
+        for (rel, wozu) in [
+            ("server.properties.dist", "Port, RCON und MOTD"),
+            ("config/paper-global.yml.dist", "die Weiterleitung"),
+        ] {
+            if !dir
+                .join(rel.replace('/', std::path::MAIN_SEPARATOR_STR))
+                .is_file()
+            {
+                add(
+                    Level::Warn,
+                    "Fester Server",
+                    format!("servers/{name}/{rel} fehlt - dann schreibt Terranova {wozu} nicht"),
+                );
+                ok = false;
+            }
+        }
+        if ok {
+            feste_ok.push(name.clone());
+        }
+    }
+    if !feste_ok.is_empty() {
+        add(
+            Level::Ok,
+            "Feste Server",
+            format!("{} - Paper und Quellen vollstaendig", feste_ok.join(", ")),
+        );
     }
     if !paths.template(&cfg.mines.template).is_dir() {
         add(
@@ -158,18 +211,16 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
                 ),
                 None => add(Level::Warn, "Weiterleitung", "player-info-forwarding-mode fehlt".into()),
             }
-            let mut missing = Vec::new();
-            for name in cfg.servers.keys() {
-                if !v.servers.contains(name) {
-                    missing.push(name.clone());
-                }
-            }
-            for slot in 1..=cfg.mines.slots {
-                let n = crate::mines::name(slot);
-                if !v.servers.contains(&n) {
-                    missing.push(n);
-                }
-            }
+            // Die festen Server muessen dastehen. Die Dungeons nicht: die
+            // traegt Terranova beim Oeffnen ein und laesst den Proxy neu
+            // laden - stehen sie trotzdem von Hand drin, weicht der eigene
+            // Block ihnen beim naechsten Schreiben.
+            let missing: Vec<String> = cfg
+                .servers
+                .keys()
+                .filter(|n| !v.servers.contains(n))
+                .cloned()
+                .collect();
             if missing.is_empty() {
                 add(
                     Level::Ok,
@@ -181,6 +232,33 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
                     Level::Fail,
                     "Servereintraege",
                     format!("in velocity.toml fehlen: {}", missing.join(", ")),
+                );
+            }
+
+            // Geschlossene zaehlen nicht mit: sie stehen absichtlich nicht
+            // im Proxy, weil sie nicht wieder hochfahren.
+            let offen = crate::mines::existing(&paths.dynamic(), cfg.mines.slots)
+                .into_iter()
+                .filter(|s| crate::mines::closed_at(&paths.mine(&crate::mines::name(*s))).is_none())
+                .count();
+            let eingetragen = v
+                .servers
+                .iter()
+                .filter(|n| crate::mines::parse_name(n).is_some())
+                .count();
+            if eingetragen == offen {
+                add(
+                    Level::Ok,
+                    "Dungeon-Eintraege",
+                    format!("{offen} offen, {eingetragen} in velocity.toml"),
+                );
+            } else {
+                add(
+                    Level::Warn,
+                    "Dungeon-Eintraege",
+                    format!(
+                        "{offen} offen, aber {eingetragen} in velocity.toml - der naechste Start oder das naechste Oeffnen zieht das nach"
+                    ),
                 );
             }
         }
@@ -289,6 +367,34 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
                 "Karte",
                 format!("Pl3xMap in {} auf Port {p}", map.server),
             ),
+        }
+
+        // Und ob der oeffentliche Name ueberhaupt existiert.
+        //
+        // Genau daran hing es einmal: lokal antwortete Pl3xMap munter mit 200
+        // und doctor meldete lauter Haken, waehrend der Name aus web.map.url
+        // gar nicht im DNS stand. Wer die Karte im Browser aufrief, sah nur
+        // eine leere Seite.
+        //
+        // Geprueft wird bewusst nur der Name, nicht die Seite selbst: fuer
+        // HTTPS braeuchte es TLS und damit eine Abhaengigkeit, die sich fuer
+        // diese eine Pruefung nicht lohnt.
+        if let Some(host) = host_of(&map.url) {
+            let loest_auf = (host.as_str(), 443u16)
+                .to_socket_addrs()
+                .is_ok_and(|mut a| a.next().is_some());
+            if loest_auf {
+                add(Level::Ok, "Karte", format!("{host} loest auf"));
+            } else {
+                add(
+                    Level::Warn,
+                    "Karte",
+                    format!(
+                        "{host} loest nicht auf - web.map.url zeigt ins Leere. \
+                         Fehlt der DNS-Eintrag fuer die Unterdomain?"
+                    ),
+                );
+            }
         }
     }
 
@@ -401,13 +507,21 @@ fn ports_of(cfg: &Config) -> Vec<(u16, String)> {
     v
 }
 
-fn java_version(java: &str) -> Option<String> {
-    let mut cmd = Command::new(java);
-    cmd.arg("-version").stdin(Stdio::null());
-    let out = sys::hide_window(&mut cmd).output().ok()?;
-    // java -version schreibt nach stderr
-    let text = String::from_utf8_lossy(&out.stderr);
-    text.lines().next().map(|l| l.trim().to_string())
+/// Der Rechnername aus einer Adresse wie `https://karte.example.org/karte`.
+///
+/// Kein URL-Parser dafuer: gebraucht wird genau dieser eine Teil, und die
+/// Adresse steht in der eigenen Konfiguration - sie kommt nicht von aussen.
+fn host_of(url: &str) -> Option<String> {
+    let rest = url.split_once("://").map_or(url, |(_, r)| r);
+    // Pfad, Abfrage und Anker abschneiden, etwaige Anmeldedaten davor weg
+    let host = rest.split(['/', '?', '#']).next()?.rsplit('@').next()?;
+    // Port abtrennen - eine IPv6-Adresse steht dabei in Klammern
+    let host = if let Some(v6) = host.strip_prefix('[') {
+        v6.split(']').next()?
+    } else {
+        host.split(':').next()?
+    };
+    (!host.is_empty()).then(|| host.to_string())
 }
 
 /// Ob noch eine geplante Windows-Aufgabe fuer den Neustart eingetragen ist.
@@ -474,6 +588,24 @@ pub fn parse_velocity(text: &str) -> Velocity {
 mod tests {
     use super::*;
 
+    #[test]
+    fn rechnername_aus_der_adresse() {
+        let h = |s| host_of(s).unwrap_or_default();
+        assert_eq!(h("https://karte.example.org"), "karte.example.org");
+        assert_eq!(
+            h("https://karte.example.org/karte?z=3#hier"),
+            "karte.example.org"
+        );
+        assert_eq!(h("http://localhost:8080"), "localhost");
+        // ohne Schema
+        assert_eq!(h("karte.example.org"), "karte.example.org");
+        // IPv6 steht in Klammern, der Doppelpunkt darin ist kein Port
+        assert_eq!(h("http://[::1]:8080/"), "::1");
+        // Leer heisst: keine oeffentliche Adresse eingetragen, nichts zu pruefen
+        assert_eq!(host_of(""), None);
+        assert_eq!(host_of("https://"), None);
+    }
+
     const TOML: &str = r#"
 config-version = "2.9"
 bind = "0.0.0.0:25565"
@@ -507,10 +639,6 @@ forwarding-secret-file = "forwarding.secret"
         assert_eq!(v.forwarding.as_deref(), Some("modern"));
         for name in cfg.servers.keys() {
             assert!(v.servers.contains(name), "{name} fehlt in velocity.toml");
-        }
-        for slot in 1..=cfg.mines.slots {
-            let n = crate::mines::name(slot);
-            assert!(v.servers.contains(&n), "{n} fehlt in velocity.toml");
         }
     }
 }

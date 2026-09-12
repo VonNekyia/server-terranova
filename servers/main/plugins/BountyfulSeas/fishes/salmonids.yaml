@@ -1,0 +1,158 @@
+# Lachsartige - Salmonids: trout, char, salmon and grayling.
+
+# Äsche — Thymallus thymallus
+# Rekordlänge (TL): 60 cm — Quelle: FishBase Species Summary, Thymallus thymallus
+# Lebensraum: klare, sauerstoffreiche Flüsse und kalte Seen
+# Wassertiefe: vorwiegend flache bis mittlere Bereiche | Temperatur: kalt bis gemäßigt | Aktivität: überwiegend tagaktiv
+european_grayling:
+  lore:
+    - "Ihre hohe Rückenflosse flackert in kristallklarer Strömung."
+  fish_name: "<gray>Äsche</gray>"
+  fish_item: "nexo:european_grayling"
+
+  max_length: 61
+  level: 4
+
+  water_type: [river, lake]
+  vegetation: [cold, temperate]
+  condition: [day]
+
+  spawn_weight: 115
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 4
+
+# Bachforelle — Salmo trutta
+# Rekordlänge (TL): etwa 140 cm — Quelle: FishBase Species Summary, Salmo trutta
+# Lebensraum: kühle, sauerstoffreiche Bäche, Flüsse und Seen
+# Wassertiefe: meist oberflächen- bis ufernah | Temperatur: bevorzugt kühles Wasser | Aktivität: besonders Dämmerung
+brown_trout:
+  lore:
+    - "Goldene Punkte flimmern unter der reißenden Strömung."
+  fish_name: "<aqua>Bachforelle</aqua>"
+  fish_item: "nexo:brown_trout"
+
+  max_length: 141
+  level: 5
+
+  water_type: [river, lake]
+  vegetation: [cold, temperate]
+
+  spawn_weight: 90
+  rarity: "rare"
+
+  on_eat:
+    saturation: 5
+
+# Regenbogenforelle — Oncorhynchus mykiss
+# Rekordlänge (TL): 122 cm — Quelle: FishBase Species Summary, Oncorhynchus mykiss
+# Lebensraum: kühle Flüsse und Seen; anadrome Form zusätzlich im Meer
+# Wassertiefe: variable Fluss- und Seebereiche | Temperatur: bevorzugt kühl | Aktivität: hauptsächlich Tag und Dämmerung
+rainbow_trout:
+  lore:
+    - "Ein rosafarbener Blitz springt aus der schnellen Strömung."
+  fish_name: "<aqua>Regenbogenforelle</aqua>"
+  fish_item: "nexo:rainbow_trout"
+
+  max_length: 123
+  level: 7
+
+  water_type: [river, lake]
+  vegetation: [cold, temperate]
+
+  spawn_weight: 80
+  rarity: "rare"
+
+  on_eat:
+    saturation: 5
+
+# Seesaibling — Salvelinus umbla
+# Artfestlegung: Alpiner Seesaibling, Salvelinus umbla
+# Rekordlänge (TL): etwa 100 cm — Quelle: FishBase / europäische Salmonidenliteratur
+# Lebensraum: tiefe, kalte Alpenseen und Voralpenseen
+# Wassertiefe: vom Ufer bis in tiefe Seezonen | Temperatur: kalt | Aktivität: variabel, häufig Dämmerung
+alpine_char:
+  lore:
+    - "Im kalten Seewasser glimmt ein tiefroter Schimmer."
+  fish_name: "<aqua>Seesaibling</aqua>"
+  fish_item: "nexo:alpine_char"
+
+  max_length: 101
+  level: 8
+
+  water_type: [lake]
+  vegetation: [cold]
+
+  spawn_weight: 55
+  rarity: "rare"
+
+  on_eat:
+    saturation: 5
+
+# Arktischer Saibling — Salvelinus alpinus
+# Rekordlänge (TL): 107 cm — Quelle: FishBase Species Summary, Salvelinus alpinus
+# Lebensraum: kalte Seen, Flüsse und arktische Küstengewässer; teilweise anadrom
+# Wassertiefe: 0–70 m | Temperatur: 4–16 °C | Aktivität: tag- und dämmerungsaktiv
+arctic_char:
+  lore:
+    - "Klares Eiswasser schimmert über seinen roten Flanken."
+  fish_name: "<aqua>Arktischer Saibling</aqua>"
+  fish_item: "nexo:arctic_char"
+
+  max_length: 108
+  level: 8
+
+  water_type: [ocean, river, lake]
+  vegetation: [cold]
+
+  spawn_weight: 70
+  rarity: "rare"
+
+  on_eat:
+    saturation: 5
+
+# Lachs — Salmo salar
+# Rekordlänge (TL): etwa 150 cm — Quelle: FishBase Species Summary, Salmo salar
+# Lebensraum: kalte Flüsse als Jugend- und Laichhabitat, Nordatlantik als adultes Habitat
+# Wassertiefe: Flüsse bis offenes Meer | Temperatur: kalt bis gemäßigt | Aktivität: variabel
+atlantic_salmon:
+  lore:
+    - "Im Fluss geboren und vom offenen Meer geformt."
+  fish_name: "<light_purple>Lachs</light_purple>"
+  fish_item: "nexo:atlantic_salmon"
+
+  max_length: 151
+  level: 14
+
+  water_type: [ocean, river]
+  vegetation: [cold, temperate]
+
+  spawn_weight: 30
+  rarity: "epic"
+
+  on_eat:
+    saturation: 6
+
+# Huchen — Hucho hucho
+# Rekordlänge (TL): etwa 150 cm — Quelle: FishBase / europäische Süßwasserliteratur
+# Lebensraum: große, kühle und sauerstoffreiche Flüsse des Donausystems
+# Wassertiefe: größere Flussrinnen und tiefe Gumpen | Temperatur: kühl bis gemäßigt
+# Aktivität: besonders Morgen- und Abenddämmerung
+huchen:
+  lore:
+    - "Der mächtige Donaulachs trotzt selbst starker Strömung."
+  fish_name: "<gradient:#ef4444:#f59e0b>Huchen</gradient>"
+  fish_item: "nexo:huchen"
+
+  max_length: 151
+  level: 18
+
+  water_type: [river]
+  vegetation: [cold, temperate]
+
+  spawn_weight: 5
+  rarity: "legendary"
+
+  on_eat:
+    saturation: 6

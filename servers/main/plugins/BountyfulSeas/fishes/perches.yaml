@@ -1,0 +1,226 @@
+# Barschartige - Perch-like fish, from the river bank to the reef.
+
+# Flussbarsch — Perca fluviatilis
+# Rekordlänge (TL): etwa 60 cm — Quelle: FishBase Species Summary, Perca fluviatilis
+# Lebensraum: Seen, Flüsse und langsamere Gewässer mit Struktur und Vegetation
+# Wassertiefe: Uferzone bis etwa 30 m | Temperatur: kalt bis gemäßigt | Aktivität: überwiegend tagaktiv
+european_perch:
+  lore:
+    - "Dunkle Streifen schleichen zwischen Schilf und versunkenem Holz."
+  fish_name: "<gray>Flussbarsch</gray>"
+  fish_item: "nexo:european_perch"
+
+  max_length: 61
+  level: 4
+
+  water_type: [river, lake]
+  vegetation: [cold, temperate]
+  condition: [day]
+
+  spawn_weight: 125
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 4
+
+# Meeräsche — Mugil cephalus
+# Rekordlänge (TL): etwa 100 cm — Quelle: FishBase Species Summary, Mugil cephalus
+# Lebensraum: Küsten, Ästuare, Lagunen und Unterläufe von Flüssen
+# Wassertiefe: überwiegend flach und küstennah | Temperatur: gemäßigt bis tropisch | Aktivität: tagaktiv
+flathead_grey_mullet:
+  lore:
+    - "Ein silberner Wanderer zwischen Fluss und Meer."
+  fish_name: "<gray>Meeräsche</gray>"
+  fish_item: "nexo:flathead_grey_mullet"
+
+  max_length: 101
+  level: 4
+
+  water_type: [ocean, river]
+
+  spawn_weight: 110
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 4
+
+# Clownfisch — Amphiprion ocellaris
+# Rekordlänge (TL): 11 cm — Quelle: FishBase Species Summary, Amphiprion ocellaris
+# Lebensraum: flache Korallenriffe und Lagunen in enger Symbiose mit Seeanemonen
+# Wassertiefe: 1–15 m | Temperatur: etwa 24–30 °C | Aktivität: tagaktiv
+ocellaris_clownfish:
+  lore:
+    - "Leuchtende Streifen tanzen zwischen giftigen Tentakeln."
+  fish_name: "<light_purple>Clownfisch</light_purple>"
+  fish_item: "nexo:ocellaris_clownfish"
+
+  max_length: 12
+  level: 4
+
+  water_type: [ocean]
+  vegetation: [warm]
+  depth: [shallow]
+  modifier: [coral]
+  condition: [day]
+
+  spawn_weight: 18
+  rarity: "epic"
+
+# Doktorfisch — Acanthurus coeruleus
+# Artfestlegung: Blauer Doktorfisch, Acanthurus coeruleus
+# Rekordlänge (TL): 39 cm — Quelle: FishBase Species Summary, Acanthurus coeruleus
+# Lebensraum: Korallenriffe, Seegras- und felsige Küstenbereiche
+# Wassertiefe: 2–50 m | Temperatur: tropisch bis subtropisch | Aktivität: tagaktiv
+blue_tang:
+  lore:
+    - "Eine blaue Klinge zieht ruhig über das Riff."
+  fish_name: "<gray>Doktorfisch</gray>"
+  fish_item: "nexo:blue_tang"
+
+  max_length: 40
+  level: 5
+
+  water_type: [ocean]
+  vegetation: [warm]
+  depth: [shallow]
+  modifier: [coral]
+  condition: [day]
+
+  spawn_weight: 90
+  rarity: "uncommon"
+
+# Papageifisch — Sparisoma viride
+# Artfestlegung: Stoplight-Papageifisch, Sparisoma viride
+# Rekordlänge (TL): 64 cm — Quelle: FishBase Species Summary, Sparisoma viride
+# Lebensraum: klare tropische Korallenriffe; Jungtiere auch in Seegras
+# Wassertiefe: 3–50 m | Temperatur: warm bis subtropisch | Aktivität: tagaktiv
+stoplight_parrotfish:
+  lore:
+    - "Ein lebendes Juwel knabbert Farben vom Riff."
+  fish_name: "<aqua>Papageifisch</aqua>"
+  fish_item: "nexo:stoplight_parrotfish"
+
+  max_length: 65
+  level: 8
+
+  water_type: [ocean]
+  vegetation: [warm]
+  depth: [shallow]
+  modifier: [coral]
+  condition: [day]
+
+  spawn_weight: 35
+  rarity: "rare"
+
+# Wolfsbarsch — Dicentrarchus labrax
+# Rekordlänge (TL): 103 cm — Quelle: FishBase Species Summary, Dicentrarchus labrax
+# Lebensraum: Küsten, Ästuare und Flussmündungen des Nordostatlantiks und Mittelmeers
+# Wassertiefe: 10–100 m | Temperatur: 8–24 °C | Aktivität: besonders Dämmerung und Nacht
+european_seabass:
+  lore:
+    - "Ein blasser Jäger patrouilliert am Rand der Gezeiten."
+  fish_name: "<aqua>Wolfsbarsch</aqua>"
+  fish_item: "nexo:european_seabass"
+
+  max_length: 104
+  level: 9
+
+  water_type: [ocean, river]
+  vegetation: [temperate]
+
+  spawn_weight: 75
+  rarity: "rare"
+
+  on_eat:
+    saturation: 5
+
+# Rotfeuerfisch — Pterois volitans
+# Rekordlänge (TL): etwa 38 cm — Quelle: FishBase Species Summary, Pterois volitans
+# Lebensraum: tropische Riffe und felsige Strukturen
+# Wassertiefe: 2–55 m | Temperatur: 22–28 °C | Aktivität: vor allem Dämmerung und Nacht
+# Giftigkeit: Gift sitzt in den Flossenstacheln; das Muskelfleisch selbst ist nicht giftig
+red_lionfish:
+  lore:
+    - "Gestreifte Flossen blühen wie eine giftige Flamme."
+  fish_name: "<light_purple>Rotfeuerfisch</light_purple>"
+  fish_item: "nexo:red_lionfish"
+
+  max_length: 39
+  level: 9
+
+  water_type: [ocean]
+  vegetation: [warm]
+  depth: [shallow]
+  condition: [night]
+
+  spawn_weight: 18
+  rarity: "epic"
+
+  on_eat:
+    saturation: 3
+
+# Barramundi — Lates calcarifer
+# Rekordlänge (TL): 200 cm — Quelle: FishBase Species Summary, Lates calcarifer
+# Lebensraum: Küstengewässer, Ästuare, Mangroven und Flüsse; katadrom
+# Wassertiefe: 10–40 m | Temperatur: 15–28 °C | Aktivität: besonders Dämmerung und Nacht
+barramundi:
+  lore:
+    - "Ein kräftiger Silberjäger aus den Gezeitengewässern."
+  fish_name: "<light_purple>Barramundi</light_purple>"
+  fish_item: "nexo:barramundi"
+
+  max_length: 201
+  level: 14
+
+  water_type: [ocean, river]
+  vegetation: [warm]
+
+  spawn_weight: 25
+  rarity: "epic"
+
+  on_eat:
+    saturation: 6
+
+# Barrakuda — Sphyraena barracuda
+# Rekordlänge (TL): 200 cm — Quelle: FishBase Species Summary, Sphyraena barracuda
+# Lebensraum: tropische und subtropische Küsten, Riffe, Lagunen und offene Küstengewässer
+# Wassertiefe: meist 0–100 m | Temperatur: etwa 23–29 °C | Aktivität: tag- und dämmerungsaktiv
+great_barracuda:
+  lore:
+    - "Ein silberner Blitz lauert unter der Wasseroberfläche."
+  fish_name: "<aqua>Barrakuda</aqua>"
+  fish_item: "nexo:great_barracuda"
+
+  max_length: 201
+  level: 15
+
+  water_type: [ocean]
+  vegetation: [warm]
+
+  spawn_weight: 55
+  rarity: "rare"
+
+  on_eat:
+    saturation: 5
+
+# Zackenbarsch — Epinephelus marginatus
+# Artfestlegung: Brauner Zackenbarsch, Epinephelus marginatus
+# Rekordlänge (TL): etwa 150 cm — Quelle: FishBase Species Summary, Epinephelus marginatus
+# Lebensraum: felsige Riffe, Höhlen und strukturreiche Küsten
+# Wassertiefe: 8–300 m, meist oberhalb 50 m | Temperatur: subtropisch | Aktivität: besonders Dämmerung
+dusky_grouper:
+  lore:
+    - "Ein mächtiger Wächter ruht zwischen den Felsen des Riffs."
+  fish_name: "<light_purple>Zackenbarsch</light_purple>"
+  fish_item: "nexo:dusky_grouper"
+
+  max_length: 151
+  level: 16
+
+  water_type: [ocean]
+
+  spawn_weight: 15
+  rarity: "epic"
+
+  on_eat:
+    saturation: 6

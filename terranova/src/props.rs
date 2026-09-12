@@ -1,6 +1,6 @@
 //! server.properties aus einer Vorlage erzeugen.
 //!
-//! Dieselbe Regel wie bisher in sync-servers.ps1: vorhandene Schluessel
+//! Dieselbe Regel wie in den alten Skripten: vorhandene Schluessel
 //! werden an Ort und Stelle ersetzt, fehlende hinten angehaengt. Kommentare
 //! und Reihenfolge bleiben stehen - so bleibt ein Diff gegen die Vorlage
 //! lesbar, und Paper sortiert die Datei beim naechsten Start ohnehin selbst.
@@ -80,7 +80,7 @@ mod tests {
 
     const RCON_PASS: &str = "RCONPASSRCONPASSRCONPASSRCON1234";
 
-    // Byteweise Fixtures: von sync-servers.ps1 erzeugt, bevor es abgeloest
+    // Byteweise Fixtures: vom alten Skript erzeugt, bevor es abgeloest
     // wurde. Was hier abweicht, waere eine Verhaltensaenderung am Server.
     const IN_MAIN: &str = include_str!("../tests/fixtures/sync/input/main/server.properties");
     const OUT_MAIN: &str = include_str!("../tests/fixtures/sync/expected/main/server.properties");
@@ -88,7 +88,7 @@ mod tests {
     const OUT_BUILD: &str = include_str!("../tests/fixtures/sync/expected/build/server.properties");
     const IN_FARM: &str = include_str!("../tests/fixtures/sync/input/farm/server.properties");
     const OUT_FARM: &str = include_str!("../tests/fixtures/sync/expected/farm/server.properties");
-    // Der Dungeon wurde von dungeon.ps1 aus der gemeinsamen Vorlage erzeugt.
+    // Der Dungeon wurde vom alten Skript aus der gemeinsamen Vorlage erzeugt.
     const IN_COMMON: &str = include_str!("../tests/fixtures/sync/input/common/server.properties");
     const OUT_MINE3: &str =
         include_str!("../tests/fixtures/sync/expected/mining-3/server.properties");

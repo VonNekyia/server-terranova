@@ -1,0 +1,53 @@
+# Aalartige - Eels - bony fish stretched the long way.
+
+# Aal — Anguilla anguilla
+# Rekordlänge (TL): 133 cm — Quelle: FishBase Species Summary, Anguilla anguilla
+# Lebensraum: Küstenmeer, Flüsse, Seen und Ästuare; katadromer Wanderfisch
+# Wassertiefe: 0–700 m | Temperatur: 4–20 °C | Aktivität: überwiegend nachtaktiv
+european_eel:
+  lore:
+    - "Ein stiller Wanderer unter mondbeschienenem Wasser."
+  fish_name: "<light_purple>Aal</light_purple>"
+  fish_item: "nexo:european_eel"
+
+  max_length: 134
+  level: 12
+
+  water_type: [ocean, river, lake]
+  vegetation: [temperate]
+  condition: [night]
+
+  spawn_weight: 32
+  rarity: "epic"
+
+  on_eat:
+    saturation: 5
+    effects:
+      - type: "poison"
+        duration: 100
+
+# Conger-Aal — Conger conger
+# Rekordlänge (TL): 300 cm — Quelle: FishBase Species Summary, Conger conger
+# Lebensraum: felsige und sandige Meeresböden; Jungtiere küstennah, große Tiere tiefer
+# Wassertiefe: 0–1171 m | Temperatur: gemäßigte Meere | Aktivität: nachtaktiv
+european_conger:
+  lore:
+    - "Eine blasse Schlange gleitet aus einer Felsspalte."
+  fish_name: "<aqua>Conger-Aal</aqua>"
+  fish_item: "nexo:european_conger"
+
+  max_length: 301
+  level: 16
+
+  water_type: [ocean]
+  vegetation: [temperate]
+  condition: [night]
+
+  spawn_weight: 50
+  rarity: "rare"
+
+  on_eat:
+    saturation: 5
+    effects:
+      - type: "poison"
+        duration: 100

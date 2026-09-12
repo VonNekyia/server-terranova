@@ -32,10 +32,12 @@ Netzwerk
   cmd <name> <befehl>   einen Befehl schicken
 
 Dungeons
-  mine open [anzahl]    oeffnen (--slot N fuer einen bestimmten Platz)
+  mine open [anzahl]    oeffnen (--slot N, --template <name>)
+  mine templates        welche Vorlagen es gibt
   mine close <n>        schliessen
   mine list             was offen ist
-  mine reap             abgelaufene abraeumen (--dry-run zeigt nur)
+  mine reap             abgelaufene abraeumen (--dry-run zeigt nur,
+                        --slot N raeumt genau den sofort ab)
 
 Oberflaeche
   dashboard             im Browser oeffnen
@@ -51,6 +53,7 @@ Optionen
   --detach              Netzwerk starten, aber nicht zusehen
   --dry-run             nichts aendern, nur zeigen
   --slot <n>            bestimmter Dungeon-Platz
+  --template <name>     Vorlage fuer mine open
   -n <anzahl>           wie viele Zeilen
   -h, --help
 ";
@@ -64,6 +67,7 @@ struct Args {
     detach: bool,
     stop_running: bool,
     slot: Option<u8>,
+    template: Option<String>,
     lines: Option<usize>,
     help: bool,
 }
@@ -79,6 +83,7 @@ fn parse() -> Result<Args, lexopt::Error> {
             Long("detach") => a.detach = true,
             Long("stop-running") => a.stop_running = true,
             Long("slot") => a.slot = Some(p.value()?.parse()?),
+            Long("template") => a.template = Some(p.value()?.string()?),
             Short('n') => a.lines = Some(p.value()?.parse()?),
             Value(v) if a.command.is_none() => a.command = Some(v.string()?),
             Value(v) => a.values.push(v.string()?),
@@ -455,7 +460,7 @@ fn status(paths: &Paths, cfg: &Config) -> ExitCode {
         for node in std::iter::once(cfg.proxy_node(paths))
             .chain(cfg.server_nodes(paths))
             .chain(
-                mines::existing(&paths.servers(), cfg.mines.slots)
+                mines::existing(&paths.dynamic(), cfg.mines.slots)
                     .into_iter()
                     .map(|s| cfg.mine_node(paths, s)),
             )
@@ -673,9 +678,28 @@ fn cmd(paths: &Paths, cfg: &Config, values: &[String]) -> ExitCode {
 
 fn mine(paths: &Paths, cfg: &Config, args: &Args) -> ExitCode {
     let Some(action) = args.values.first().map(String::as_str) else {
-        eprintln!("terranova: mine open | close | list | reap");
+        eprintln!("terranova: mine open | close | list | reap | templates");
         return ExitCode::from(2);
     };
+    // Welche Vorlagen es gibt, steht im Dateisystem - danach zu fragen, soll
+    // nicht voraussetzen, dass das Netzwerk schon laeuft.
+    if action == "templates" {
+        let static_names: Vec<String> = cfg.servers.keys().cloned().collect();
+        let list = crate::mines::templates(&paths.templates(), &static_names);
+        if list.is_empty() {
+            println!("Keine Vorlage unter templates/ - ausser der gemeinsamen.");
+        }
+        for name in list {
+            let mark = if name == cfg.mines.template {
+                "  (Vorgabe)"
+            } else {
+                ""
+            };
+            println!("  {name}{mark}");
+        }
+        return ExitCode::SUCCESS;
+    }
+
     let c = match need_supervisor(paths, cfg) {
         Ok(c) => c,
         Err(e) => return e,
@@ -684,10 +708,13 @@ fn mine(paths: &Paths, cfg: &Config, args: &Args) -> ExitCode {
     match action {
         "open" => {
             let count: u8 = args.values.get(1).and_then(|v| v.parse().ok()).unwrap_or(1);
-            let body = match args.slot {
-                Some(s) => json!({ "count": count, "slot": s }),
-                None => json!({ "count": count }),
-            };
+            let mut body = json!({ "count": count });
+            if let Some(s) = args.slot {
+                body["slot"] = json!(s);
+            }
+            if let Some(t) = &args.template {
+                body["template"] = json!(t);
+            }
             match c.post("/api/mines/open", body) {
                 Ok((200, body)) => {
                     let v: serde_json::Value = serde_json::from_str(&body).unwrap_or_default();
@@ -740,6 +767,14 @@ fn mine(paths: &Paths, cfg: &Config, args: &Args) -> ExitCode {
             }
             other => report(other, ""),
         },
+        // Mit --slot: genau den, sofort, ohne Ruecksicht auf sein Alter.
+        "reap" if args.slot.is_some() => {
+            let slot = args.slot.unwrap();
+            report(
+                c.post(&format!("/api/mines/{slot}/reap"), json!({})),
+                &format!("[terranova] mining-{slot} abgeraeumt - die Welt ist weg"),
+            )
+        }
         "reap" => match c.post(
             "/api/mines/reap",
             json!({ "dry_run": args.dry_run, "stop_running": args.stop_running }),
@@ -754,7 +789,7 @@ fn mine(paths: &Paths, cfg: &Config, args: &Args) -> ExitCode {
             other => report(other, ""),
         },
         other => {
-            eprintln!("terranova: mine {other}? Es gibt open, close, list, reap.");
+            eprintln!("terranova: mine {other}? Es gibt open, close, list, reap, templates.");
             ExitCode::from(2)
         }
     }
@@ -789,7 +824,7 @@ fn sync_cmd(paths: &Paths, cfg: &Config, which: &[String], dry_run: bool) -> Exi
     let mut nodes = Vec::new();
     if which.is_empty() {
         nodes.extend(cfg.server_nodes(paths));
-        for slot in mines::existing(&paths.servers(), cfg.mines.slots) {
+        for slot in mines::existing(&paths.dynamic(), cfg.mines.slots) {
             nodes.push(cfg.mine_node(paths, slot));
         }
     } else {

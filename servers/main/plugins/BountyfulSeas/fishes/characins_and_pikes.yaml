@@ -1,0 +1,87 @@
+# Salmler & Hechte - Freshwater ambush and pack hunters.
+
+# Blinder Höhlenfisch — Astyanax mexicanus, Höhlenform
+# Rekordlänge (TL): 12 cm — Quelle: FishBase Species Summary, Astyanax mexicanus
+# Lebensraum: dauerhaft dunkle Höhlengewässer und unterirdische Pools in Mexiko
+# Wassertiefe: flache bis mittlere Höhlenbecken | Temperatur: subtropisch bis warm
+# Aktivität: keine natürliche Bindung an Tageslicht; Leben in permanenter Dunkelheit
+blind_cave_tetra:
+  lore:
+    - "Blind und bleich ertastet er jede Bewegung im Wasser."
+  fish_name: "<aqua>Blinder Höhlenfisch</aqua>"
+  fish_item: "nexo:blind_cave_tetra"
+
+  max_length: 13
+  level: 8
+
+  water_type: [cave]
+
+  spawn_weight: 50
+  rarity: "rare"
+
+# Piranha — Pygocentrus nattereri
+# Artfestlegung: Roter Piranha, Pygocentrus nattereri
+# Rekordlänge (TL): etwa 50 cm — Quelle: FishBase Species Summary, Pygocentrus nattereri
+# Lebensraum: Amazonas- und Paraná-Systeme, Flüsse und verbundene Überschwemmungsgewässer
+# Wassertiefe: überwiegend flach bis mitteltief | Temperatur: tropisch | Aktivität: vor allem Morgen- und Abenddämmerung
+red_bellied_piranha:
+  lore:
+    - "Roter Bauch, silberne Flanken und messerscharfe Zähne."
+  fish_name: "<aqua>Piranha</aqua>"
+  fish_item: "nexo:red_bellied_piranha"
+
+  max_length: 51
+  level: 8
+
+  water_type: [river, lake]
+  vegetation: [warm]
+
+  spawn_weight: 55
+  rarity: "rare"
+
+  on_eat:
+    saturation: 4
+
+# Hecht — Esox lucius
+# Rekordlänge (TL): 150 cm — Quelle: FishBase Species Summary, Esox lucius
+# Lebensraum: Seen und langsamere Flüsse mit Pflanzen, Schilf und Deckung
+# Wassertiefe: 0–30 m, meist 1–5 m | Temperatur: 10–28 °C | Aktivität: Tag und Dämmerung
+northern_pike:
+  lore:
+    - "Ein grüner Speer wartet regungslos zwischen Wasserpflanzen."
+  fish_name: "<light_purple>Hecht</light_purple>"
+  fish_item: "nexo:northern_pike"
+
+  max_length: 151
+  level: 10
+
+  water_type: [river, lake]
+
+  spawn_weight: 25
+  rarity: "epic"
+
+  on_eat:
+    saturation: 5
+
+# Goliath-Tigerfisch — Hydrocynus goliath
+# Rekordlänge: bis etwa 150 cm Gesamtlänge — Quelle: FishBase Species Summary, Hydrocynus goliath
+# Lebensraum: große Flüsse und Seen im Kongobecken
+# Wassertiefe: offene Fluss- und Seebereiche | Temperatur: tropisch | Aktivität: überwiegend tagaktiv
+goliath_tigerfish:
+  lore:
+    - "Gewaltige Zähne blitzen im Maul eines Flussjägers."
+  fish_name: "<gradient:#d1d5db:#ef4444>Goliath-Tigerfisch</gradient>"
+  fish_item: "nexo:goliath_tigerfish"
+
+  max_length: 151
+  level: 20
+
+  water_type: [river, lake]
+  vegetation: [warm]
+  condition: [day]
+
+  spawn_weight: 4
+  rarity: "legendary"
+
+  on_eat:
+    saturation: 6

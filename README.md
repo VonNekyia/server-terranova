@@ -24,8 +24,12 @@ Die Server selbst haben **kein eigenes Fenster** mehr. An ihre Konsole kommt
 man mit `terranova console <name>` oder über das Dashboard — von überall, auch
 aus einem zweiten Terminal.
 
-Voraussetzung ist eine Java-Laufzeit. Getestet mit Java 25 und 26. Mit
-`TERRANOVA_JAVA=<Pfad zu java.exe>` lässt sich eine bestimmte erzwingen.
+Java muss nicht installiert sein. Paper verlangt mindestens Java 25
+(`java.version` in `terranova.yml`). Findet Terranova unter `java.path` ein
+passendes, nimmt es das — sonst lädt es beim ersten Start ein festgenageltes
+Temurin-JRE nach `runtime/java` herunter (ca. 60 MB, Prüfsumme wie bei
+MariaDB). Mit `TERRANOVA_JAVA=<Pfad zu java>` lässt sich ein bestimmtes
+erzwingen; `terranova doctor` zeigt, welches benutzt wird.
 
 ### Linux
 
@@ -38,8 +42,9 @@ oder gleich `bin/terranova start`. Dieselben Befehle, dieselbe
 Prozessverwaltung: statt der Windows-API liest Terranova dort `/proc`, und
 zum Stoppen gibt es mit `SIGTERM` einen Weg, den es unter Windows nicht gibt.
 
-Anders als unter Windows lädt Terranova hier **nichts** herunter. MariaDB und
-Redis kommen aus der Distribution:
+Anders als unter Windows lädt Terranova hier MariaDB und Redis **nicht**
+herunter — die kommen aus der Distribution. Java dagegen schon, wenn keines
+passt: die Paketquellen hängen Paper oft Jahre hinterher.
 
 ```
 sudo apt install mariadb-server redis-server
@@ -49,10 +54,17 @@ Fehlt eines von beiden, sagt Terranova beim Start, wie es hereinkommt. Das
 Datenverzeichnis unter `runtime/` gehört trotzdem Terranova; eine
 Systeminstanz auf 3306 bleibt unberührt.
 
-Unter `bin/` liegt nur die Windows-Programmdatei — eine je System einzuchecken
-hieße, sie bei jeder Änderung doppelt zu pflegen. `start.sh` baut die
-Linux-Fassung deshalb beim ersten Mal selbst, sofern Rust installiert ist.
-Fertige Binaries für x86_64 und aarch64 fallen ansonsten in der CI an.
+Unter `bin/` liegen beide Programmdateien: `terranova.exe` und `terranova`,
+letztere statisch gegen musl gebaut, also ohne Abhängigkeit von der glibc der
+Distribution. Auf anderen Architekturen baut `start.sh` beim ersten Mal selbst,
+sofern Rust installiert ist, und legt das Ergebnis als `bin/terranova-<arch>` ab.
+
+Neu bauen, von Windows aus:
+
+```
+rustup target add x86_64-unknown-linux-musl
+CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=rust-lld cargo build --release --target x86_64-unknown-linux-musl
+```
 
 ### Nur das Nötigste
 
@@ -83,7 +95,7 @@ schmalen Start wird über Nacht also kein vollständiger.
 | `main` | 25566 | 4 GB | die gewachsene Welt: Nations, BetonQuest, Nexo, Pl3xMap, BountyfulSeas, Citizens, Proficisci |
 | `build` | 25567 | 2 GB | Bauserver, Kreativ, flache Welt |
 | `farm` | 25568 | 2 GB | Farmserver |
-| `mining-1` … `mining-8` | 25571 … | 2 GB | Dungeons, auf Zuruf geöffnet |
+| `mining-1` … `mining-8` | 25571 … | 2 GB | Dungeons, auf Zuruf geöffnet, im Proxy zur Laufzeit eingetragen |
 
 Nur der Proxy ist von außen erreichbar. Die Server binden auf `127.0.0.1` —
 wer direkt auf 25566 will, müsste schon auf der Maschine sein.
@@ -120,19 +132,51 @@ oder vom Arbeitsverzeichnis aufwärts.
 terranova mine open 3
 ```
 
-Ein Dungeon ist eine Kopie von `templates\mining` auf einem eigenen Port. Die
-acht Plätze stehen fest in `proxy\velocity.toml`; geöffnet wird nur, was
-gebraucht wird. Ein eingetragener, nicht laufender Server stört Velocity nicht —
-ein Verbindungsversuch gibt dann nur eine Fehlermeldung.
+Ein Dungeon ist eine Kopie einer Vorlage auf einem eigenen Port — welcher,
+sagt `--template`; `terranova mine templates` zeigt, was zur Wahl steht. Womit
+er angelegt wurde, merkt er sich, und dabei bleibt es auch beim Bestücken.
 
-Ein Dungeon bleibt **24 Stunden** offen und übersteht dabei auch einen
-Neustart des Netzwerks: er wird beim nächsten Start wieder hochgefahren
-(`mines.resume`). Abgeräumt wird er vom Supervisor selbst, im Takt von
-`schedule.reap_every`.
+Den Eintrag in `proxy\velocity.toml` legt Terranova selbst an und lässt den
+Proxy mit `velocity reload` nachladen — Velocity meldet Server zur Laufzeit an
+und ab. In der Datei gehört ihm nur der Block zwischen den beiden
+Markierungszeilen; alles andere darin bleibt unangetastet. Wer `mines.slots`
+ändert, muss dort also nichts nachziehen.
+
+Ein Dungeon läuft, solange es ihn gibt: ein Neustart des Netzwerks bringt ihn
+zurück, ein Absturz auch (`mines.resume`). Von selbst angelegt wird trotzdem
+keiner — nur `mine open` legt einen an. Nach **24 Stunden** ist er weg; der
+Supervisor räumt ihn im Takt von `schedule.reap_every` ab und fährt ihn dafür
+herunter, auch wenn gerade jemand darin steht. Wer drin ist, landet auf `main`.
+
+`Schließen` beendet ihn vorzeitig: er bleibt unten, der Proxy meldet ihn ab,
+und die Uhr fängt von vorn an — nach weiteren 24 Stunden ist er weg. Bis dahin
+holt `mine open --slot N` ihn samt seiner Welt zurück; im Dashboard heißt der
+Knopf `Reopen`. Wer ihn sofort loswerden will, nimmt `Reaper` beziehungsweise
+`mine reap --slot N` — danach ist die Welt weg und der Platz frei.
+
+### Eine Welt in der Vorlage
+
+Was in `templates/<name>/` liegt, wird beim **Anlegen** eines Dungeons einmal
+kopiert — ein `world/` darin also auch. Kopiert wird aber nur, wenn das
+Verzeichnis noch nicht existiert: ein Dungeon behält seine Welt, sonst wäre ein
+Neustart des Netzwerks eine Landkarte weiter.
+
+Wer die Vorlagenwelt ändert, sieht davon in einem **bestehenden** Dungeon
+deshalb nichts. Erst räumen, dann öffnen:
+
+```
+terranova mine reap --slot 1
+terranova mine open --slot 1
+```
+
+Worlds unter `templates/` sind nicht versioniert (`templates/*/world/` steht in
+`.gitignore`). Auf einem anderen Klon fehlt eine Vorlagenwelt also — wer sie
+teilen will, muss die Regel dort streichen.
 
 Gelöscht heißt: Verzeichnis weg, das nächste `open` legt eine frische Welt an.
-Ein noch laufender Dungeon wird übersprungen, `--stop-running` beendet ihn
-vorher sauber. Abgeräumt wird über `servers\.trash`: erst umbenennen, dann
+`terranova mine reap` von Hand überspringt einen laufenden Dungeon —
+`--stop-running` beendet ihn vorher sauber. Der Supervisor und der Knopf im
+Dashboard tun das von sich aus, sonst käme nie einer an die Reihe. Abgeräumt wird über `servers_dynamic\.trash`: erst umbenennen, dann
 löschen — das Umbenennen scheitert, solange jemand Dateien offen hält, also
 kann kein halb gelöschter Dungeon entstehen.
 
@@ -142,6 +186,7 @@ kann kein halb gelöschter Dungeon entstehen.
 start.bat                   ruft nur bin\terranova.exe start auf
 start.sh                    dasselbe unter Linux
 bin/terranova.exe           das Programm, versioniert
+bin/terranova               dasselbe fuer Linux x86_64, statisch gebaut
 terranova.yml               was läuft, mit wie viel Speicher, auf welchem Port
 terranova/                  sein Quelltext (Rust)
   src/win.rs                Prozesse, Ports, Zeit — über die Windows-API
@@ -151,28 +196,38 @@ proxy/
   velocity.toml             versioniert
   velocity-*.jar            versioniert
   forwarding.secret         nicht versioniert
-servers/
-  main/  build/  farm/      versioniert: nur die Plugin-Configs
-  mining-*/                 nicht versioniert
-templates/
+servers/                    die festen Server, vollstaendig versioniert
+  main/  build/  farm/      Paper, Plugin-Jars, Configs - was da liegt, laeuft
+    server.properties.dist  Quelle; die fertige Datei traegt das RCON-Passwort
+    config/paper-global.yml.dist   Quelle; die fertige traegt das Secret
+servers_dynamic/            die Dungeons, nicht versioniert
+  mining-*/                 entstehen aus templates/, nach 24 h weg
+templates/                  nur noch fuer Dungeons
   common/                   Paper, gemeinsame Configs, gemeinsame Plugin-Jars
-  main/                     was nur main braucht
   mining/                   die Dungeon-Vorlage
 runtime/                    MariaDB, Redis, Geheimnisse, Zustand — nichts davon versioniert
 ```
 
 ### Wo ein Plugin hingehört
 
-Jedes Jar liegt **genau einmal** im Repository, nämlich unter `templates/`.
-Terranova kopiert es vor jedem Start in die Server. Ein Plugin-Update ist damit
-eine Datei, kein viermaliges Kopieren — und beim nächsten Neustart ist es
-überall wirksam.
+Bei einem **festen Server** dorthin, wo es laufen soll: `servers/main/plugins/`.
+Das Jar wird committet, und damit ist es überall dort, wo das Repository ist.
+Terranova kopiert nichts in einen festen Server hinein — was im Verzeichnis
+liegt, ist was läuft. Wer ein Plugin aktualisiert, ersetzt die Datei und
+committet sie.
 
-**`templates/common/plugins/`** — was auf jedem Server laufen soll:
+Dass dasselbe Jar dann in `main`, `build` und `farm` liegt, kostet im
+Repository nichts: Git speichert nach Inhalt, drei gleiche Dateien sind ein
+Objekt. Auf der Platte lagen sie ohnehin schon dreimal.
+
+Bei einem **Dungeon** dagegen weiter unter `templates/` — er entsteht ja bei
+jedem Öffnen neu.
+
+**`templates/common/plugins/`** — was in jedem Dungeon laufen soll, heute:
 TerranovaLib, LuckPerms, HuskSync, PlaceholderAPI samt Expansions, Vault, TAB,
 ChatControl, InteractiveChat, packetevents, FastAsyncWorldEdit, WorldGuard.
 
-**`templates/main/plugins/`** — was an mains Welt und seinen Tabellen hängt:
+**`servers/main/plugins/`** — was an mains Welt und seinen Tabellen hängt:
 Nations, Proficisci, PlayerActionAdapter, BountyfulSeas, Nexo, Citizens,
 Pl3xMap, BetonQuest. Pl3xMap (Port 8080) und Nexos Packserver (8082) binden
 feste Ports und können ohnehin nur einmal laufen.
@@ -185,13 +240,19 @@ cd ..\BountyfulMining
 gradle deployToTestServer
 ```
 
-Was Terranova hierher kopiert hat, steht in `.terranova-sync.json`. Fällt ein
-Jar aus der Vorlage weg, verschwindet die Kopie — sonst lägen nach einem
-Plugin-Update die alte und die neue Fassung nebeneinander im Serververzeichnis.
+Was Terranova in einen Dungeon kopiert hat, steht dort in
+`.terranova-sync.json`. Fällt ein Jar aus der Vorlage weg, verschwindet die
+Kopie — sonst lägen nach einem Plugin-Update die alte und die neue Fassung
+nebeneinander.
 
-Versioniert ist unter `servers/` nur, was ein Server wirklich selbst besitzt:
-die Configs seiner Plugins. Paper, die gemeinsamen Configs, alle Jars und auch
-`server.properties` entstehen beim Start aus `templates/`.
+### Die zwei Dateien, die nicht ins Repository gehören
+
+In `server.properties` steht das RCON-Passwort, in `config/paper-global.yml`
+das Forwarding-Secret. Beide entstehen bei jedem Start neu — aus
+`server.properties.dist` und `config/paper-global.yml.dist` daneben, die
+versioniert sind. Wer den MOTD oder eine Paper-Einstellung dauerhaft ändern
+will, ändert die `.dist`-Datei; Port, RCON-Port und das Geheimnis setzt
+Terranova beim Schreiben selbst.
 
 ## Eine Datenbank hinzufügen
 
@@ -356,8 +417,8 @@ und danach `wsl --shutdown`. Auch das rechnet `doctor` vor.
 ## Speicher
 
 Proxy 0,5 + main 4 + build 2 + farm 2 macht 8,5 GB Grundlast. Bei 32 GB im
-Rechner bleiben etwa 20 GB für Dungeons, also rund **acht** gleichzeitig — was
-genau den acht Plätzen in `velocity.toml` entspricht.
+Rechner bleiben etwa 20 GB für Dungeons, also rund **acht** gleichzeitig — die
+Obergrenze setzt `mines.slots` in `terranova.yml`.
 
 ## Mitarbeiten
 
@@ -379,9 +440,13 @@ Nicht im Repository, weil zur Laufzeit erzeugt oder heruntergeladen:
 | Pfad | Warum |
 | --- | --- |
 | `runtime/` | MariaDB, Redis, Geheimnisse, Zustand |
-| `servers/*/*.jar`, `servers/*/plugins/*.jar` | Kopien aus `templates/` |
-| `servers/*/config/`, `server.properties`, `eula.txt`, `bukkit.yml`, `spigot.yml` | dito; enthalten Forwarding-Secret und RCON-Passwort |
-| `servers/mining-*/` | Dungeons, nach 24 h ohnehin weg |
+| `servers/*/server.properties` | enthält das RCON-Passwort; entsteht aus `.dist` |
+| `servers/*/config/paper-global.yml` | enthält das Forwarding-Secret; entsteht aus `.dist` |
+| `servers/*/whitelist.json`, `banned-*.json` | hängt an diesem Netzwerk; Paper legt sie leer an |
+| `servers/*/plugins/TAB/playerdata.yml` | was TAB sich zu Spielern merkt |
+| `servers/*/plugins/Proficisci/storage/` | aus mains Welt gerechnet |
+| `servers/*/plugins/BountyfulSeas/water_regions.bin` | aus mains Welt gescannt |
+| `servers_dynamic/` | Dungeons, nach 24 h ohnehin weg |
 | `proxy/forwarding.secret` | Geheimnis |
 | `**/world/`, `**/logs/`, `**/cache/`, `**/libraries/`, `**/versions/` | Laufzeitdaten |
 | `terranova/target/` | Bauverzeichnis |

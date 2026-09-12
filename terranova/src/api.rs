@@ -331,13 +331,38 @@ impl Api {
                 })
             })
             .collect();
-        ok_json(json!({ "slots": self.sup.cfg.mines.slots, "mines": list }))
+        ok_json(json!({
+            "slots": self.sup.cfg.mines.slots,
+            "mines": list,
+            // Woraus sich ein dynamischer Server starten laesst, und was
+            // gilt, wenn niemand waehlt.
+            "templates": self.templates(),
+            "template": self.sup.cfg.mines.template,
+        }))
+    }
+
+    /// Die Vorlagen, aus denen sich ein dynamischer Server starten laesst.
+    fn templates(&self) -> Vec<String> {
+        let static_names: Vec<String> = self.sup.cfg.servers.keys().cloned().collect();
+        mines::templates(&self.sup.paths.templates(), &static_names)
     }
 
     fn open_mines(&self, req: &Request) -> Reply {
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let count = body.get("count").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
         let slot = body.get("slot").and_then(|v| v.as_u64()).map(|v| v as u8);
+        // Welche Vorlage - ohne Angabe die aus der Konfiguration.
+        let template = body
+            .get("template")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty());
+        // Nur was wirklich unter templates/ liegt: der Name landet sonst als
+        // Pfadbestandteil im Kopierbefehl.
+        if let Some(t) = template {
+            if !self.templates().iter().any(|k| k == t) {
+                return bad(400, &format!("keine Vorlage {t}"));
+            }
+        }
         let running = |n: u8| {
             self.sup
                 .node(&mines::name(n))
@@ -349,7 +374,7 @@ impl Api {
         };
         let mut opened = Vec::new();
         for s in picked {
-            match self.sup.open_mine(s) {
+            match self.sup.open_mine(s, template) {
                 Ok(n) => opened.push(json!({ "name": n.spec.name, "port": n.spec.port })),
                 Err(e) => return bad(500, &format!("mining-{s}: {e}")),
             }

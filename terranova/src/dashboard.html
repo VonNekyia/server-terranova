@@ -78,6 +78,9 @@
   .bar { display: flex; gap: 8px; align-items: center; padding: 12px 16px; flex-wrap: wrap; }
   .bar input[type=number] { width: 56px; background: #12151a; color: var(--fg);
     border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; }
+  .bar select { background: #12151a; color: var(--fg); font-size: 13px;
+    border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; }
+  .bar select:focus { outline: none; border-color: var(--accent); }
   #toast {
     position: fixed; right: 20px; bottom: 20px; background: var(--panel);
     border: 1px solid var(--bad); color: var(--bad); padding: 10px 14px;
@@ -107,6 +110,21 @@
   </section>
 
   <section>
+    <h2>Dynamische Server</h2>
+    <p class="dim">Dungeons — werden auf Zuruf geöffnet und laufen nach ihrer
+      Zeit von selbst aus.</p>
+    <table><tbody id="mines"></tbody></table>
+    <div class="bar">
+      <button id="open">Öffnen</button>
+      <input type="number" id="count" value="1" min="1" max="99" title="wie viele">
+      <select id="template" title="aus welcher Vorlage"></select>
+      <span class="dim" id="slots"></span>
+      <span style="flex:1"></span>
+      <button id="reap">Abgelaufene abräumen</button>
+    </div>
+  </section>
+
+  <section>
     <h2>Web</h2>
     <table><tbody id="web"></tbody></table>
   </section>
@@ -117,20 +135,6 @@
     <div class="inputrow">
       <input id="cmd" placeholder="Befehl an den Server – Eingabetaste schickt ihn ab" autocomplete="off" disabled>
       <button id="send" disabled>Senden</button>
-    </div>
-  </section>
-
-  <section>
-    <h2>Dynamische Server</h2>
-    <p class="dim">Dungeons — werden auf Zuruf geöffnet und laufen nach ihrer
-      Zeit von selbst aus.</p>
-    <table><tbody id="mines"></tbody></table>
-    <div class="bar">
-      <button id="open">Öffnen</button>
-      <input type="number" id="count" value="1" min="1" max="99" title="wie viele">
-      <span class="dim" id="slots"></span>
-      <span style="flex:1"></span>
-      <button id="reap">Abgelaufene abräumen</button>
     </div>
   </section>
 </main>
@@ -211,6 +215,26 @@ function tagHtml(tags) {
     .filter(t => t !== "static" && t !== "dynamic")
     .map(t => `<span class="tag ${t}">${t}</span>`)
     .join("");
+}
+
+// Die Vorlagenliste aendert sich nur, wenn jemand einen Ordner anlegt. Neu
+// bauen wuerde die Auswahl des Nutzers mitten im Klick zuruecksetzen - also
+// erst vergleichen, und die getroffene Wahl ueber die Aktualisierung retten.
+function fillTemplates(templates, fallback) {
+  const sel = $("#template");
+  const same =
+    sel.options.length === templates.length &&
+    templates.every((t, i) => sel.options[i].value === t);
+  if (same) return;
+  const chosen = sel.value;
+  sel.textContent = "";
+  for (const t of templates) {
+    const o = document.createElement("option");
+    o.value = t;
+    o.textContent = t;
+    sel.append(o);
+  }
+  sel.value = templates.includes(chosen) ? chosen : fallback || templates[0] || "";
 }
 
 function fillNode(r, n) {
@@ -336,6 +360,7 @@ async function refresh() {
 
     const m = await api("/api/mines");
     $("#slots").textContent = `${m.mines.length} von ${m.slots} Plätzen belegt`;
+    fillTemplates(m.templates || [], m.template);
     const mb = $("#mines");
     // Die Dungeon-Liste ist kurz und aendert sich selten - hier genuegt neu
     // zeichnen, solange gerade keine Schaltflaeche gedrueckt wird.
@@ -379,7 +404,10 @@ $("#netstop").onclick = async () => {
   try { await api("/api/network/stop", "POST"); } catch (e) { toast(e.message); }
 };
 $("#open").onclick = async () => {
-  try { await api("/api/mines/open", "POST", { count: +$("#count").value || 1 }); }
+  const body = { count: +$("#count").value || 1 };
+  const t = $("#template").value;
+  if (t) body.template = t;
+  try { await api("/api/mines/open", "POST", body); }
   catch (e) { toast(e.message); }
   refresh();
 };

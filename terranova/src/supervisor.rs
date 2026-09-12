@@ -831,15 +831,32 @@ impl Supervisor {
     // --- Dungeons -------------------------------------------------------------------
 
     /// Legt einen Dungeon an, falls noetig, und startet ihn.
-    pub fn open_mine(self: &Arc<Self>, slot: u8) -> io::Result<Arc<Node>> {
-        let spec = self.cfg.mine_node(&self.paths, slot);
-        let dir = spec.dir.clone();
+    /// Oeffnet einen Dungeon. `template` waehlt die Vorlage; ohne Angabe die
+    /// aus der Konfiguration.
+    ///
+    /// Die Vorlage zaehlt nur beim Anlegen - ein vorhandener Dungeon behaelt
+    /// seine Welt und wird weiter aus der Vorlage bestueckt, aus der er
+    /// entstanden ist.
+    pub fn open_mine(self: &Arc<Self>, slot: u8, template: Option<&str>) -> io::Result<Arc<Node>> {
+        let dir = self.paths.server(&mines::name(slot));
         if !dir.exists() {
-            let template = self.paths.template(&self.cfg.mines.template);
-            copy_tree(&template, &dir)?;
-            mines::write_marker(&dir, slot, mines::now_unix())?;
-            self.log(format!("{}: aus der Vorlage angelegt", spec.name));
+            let chosen = template.unwrap_or(&self.cfg.mines.template);
+            let from = self.paths.template(chosen);
+            if !from.is_dir() {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("keine Vorlage templates/{chosen}"),
+                ));
+            }
+            copy_tree(&from, &dir)?;
+            mines::write_marker(&dir, slot, mines::now_unix(), Some(chosen))?;
+            self.log(format!(
+                "{}: aus der Vorlage {chosen} angelegt",
+                mines::name(slot)
+            ));
         }
+        // Erst jetzt: der Bauplan liest die Vorlage aus der Markierung.
+        let spec = self.cfg.mine_node(&self.paths, slot);
         let node = {
             let mut n = self.nodes.lock().unwrap();
             n.entry(spec.name.clone())

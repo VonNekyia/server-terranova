@@ -161,8 +161,10 @@ pub struct Mines {
     pub lifetime: Dur,
     #[serde(default = "default_mine_motd")]
     pub motd: String,
-    /// Offene Dungeons nach einem Netzwerk-Neustart wieder hochfahren
-    #[serde(default = "default_true")]
+    /// Offene Dungeons nach einem Netzwerk-Neustart wieder hochfahren.
+    /// Aus, solange nichts anderes dasteht: ein Dungeon soll nur starten,
+    /// weil jemand ihn oeffnet.
+    #[serde(default)]
     pub resume: bool,
     #[serde(default)]
     pub stop_timeout: Option<Dur>,
@@ -337,9 +339,6 @@ fn default_mine_template() -> String {
 }
 fn default_mine_motd() -> String {
     "Terranova Mine {n}".into()
-}
-fn default_true() -> bool {
-    true
 }
 fn default_reap_every() -> Dur {
     Dur(Duration::from_secs(15 * 60))
@@ -579,11 +578,17 @@ impl Config {
     pub fn mine_node(&self, paths: &Paths, slot: u8) -> NodeSpec {
         let name = crate::mines::name(slot);
         let port = self.mines.base_port + u16::from(slot);
+        let dir = paths.server(&name);
+        // Bestueckt wird aus der Vorlage, aus der er auch entstanden ist -
+        // die steht in seiner Markierung, sobald beim Oeffnen eine andere
+        // gewaehlt wurde. Ohne Markierung gilt die Vorgabe.
+        let template =
+            crate::mines::template_of(&dir).unwrap_or_else(|| self.mines.template.clone());
         NodeSpec {
-            dir: paths.server(&name),
+            dir,
             name,
             kind: NodeKind::Mine(slot),
-            template: Some(self.mines.template.clone()),
+            template: Some(template),
             port,
             rcon_port: Some(self.rcon_port(port)),
             memory: self.mines.memory,

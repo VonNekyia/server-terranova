@@ -19,6 +19,15 @@ pub struct Marker {
     pub slot: u8,
     /// Sekunden seit 1970
     pub opened_at: u64,
+    /// Aus welcher Vorlage der Dungeon entstand.
+    ///
+    /// Kopiert wird nur einmal, beim Anlegen - bestueckt wird dagegen bei
+    /// jedem Start. Ohne diese Angabe bekaeme ein Dungeon aus einer anderen
+    /// Vorlage beim naechsten Start die Jars der Standardvorlage
+    /// untergeschoben. Aeltere Dungeons haben sie nicht; fuer die gilt die
+    /// Vorgabe aus der Konfiguration.
+    #[serde(default)]
+    pub template: Option<String>,
 }
 
 pub fn name(slot: u8) -> String {
@@ -36,12 +45,45 @@ pub fn now_unix() -> u64 {
         .map_or(0, |d| d.as_secs())
 }
 
-pub fn write_marker(dir: &Path, slot: u8, opened_at: u64) -> io::Result<()> {
-    let m = Marker { slot, opened_at };
+pub fn write_marker(
+    dir: &Path,
+    slot: u8,
+    opened_at: u64,
+    template: Option<&str>,
+) -> io::Result<()> {
+    let m = Marker {
+        slot,
+        opened_at,
+        template: template.map(str::to_string),
+    };
     fs::write(
         dir.join(MARKER),
         serde_json::to_vec_pretty(&m).expect("Marker"),
     )
+}
+
+/// Aus welcher Vorlage dieser Dungeon entstand, falls bekannt.
+pub fn template_of(dir: &Path) -> Option<String> {
+    let text = fs::read_to_string(dir.join(MARKER)).ok()?;
+    serde_json::from_str::<Marker>(&text).ok()?.template
+}
+
+/// Welche Vorlagen sich als dynamischer Server starten lassen.
+///
+/// Alles unter templates/ ausser der gemeinsamen Grundlage und den Vorlagen
+/// der festen Server - die gehoeren zu main, build und farm und haben als
+/// Dungeon nichts verloren.
+pub fn templates(templates_dir: &Path, static_names: &[String]) -> Vec<String> {
+    let mut v: Vec<String> = fs::read_dir(templates_dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n != "common" && !static_names.contains(n))
+        .collect();
+    v.sort();
+    v
 }
 
 /// Wann wurde der Dungeon geoeffnet?
@@ -240,7 +282,7 @@ mod tests {
     #[test]
     fn markierung_schlaegt_verzeichnisdatum() {
         let dir = crate::testutil::tempdir("mine-marker");
-        write_marker(&dir, 4, 12345).unwrap();
+        write_marker(&dir, 4, 12345, None).unwrap();
         assert_eq!(opened_at(&dir), Some(12345));
         fs::remove_file(dir.join(MARKER)).unwrap();
         // ohne Markierung: Anlegedatum, also ungefaehr jetzt

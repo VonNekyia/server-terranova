@@ -35,11 +35,11 @@ runtime/
 servers/*/server.properties
 servers/*/config/paper-global.yml
 
-# Wer wo Operator ist, wer gesperrt ist: haengt an Spielern und an diesem
-# einen Netzwerk, nicht am Server selbst. Paper legt die Dateien beim Start
-# leer an, wenn sie fehlen. Ein OP wird ueber die Konsole gesetzt, die Rechte
-# verwaltet ohnehin LuckPerms.
-servers/*/ops.json
+# Wer gesperrt ist und wer auf der Weissen Liste steht, haengt an diesem
+# einen Netzwerk. Paper legt die Dateien beim Start leer an, wenn sie fehlen.
+#
+# ops.json dagegen bleibt versioniert: da traegt sich jeder selbst ein, und
+# dann muss niemand sich auf einem frischen Klon erst wieder selbst opnen.
 servers/*/whitelist.json
 servers/*/banned-players.json
 servers/*/banned-ips.json

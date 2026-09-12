@@ -11,6 +11,7 @@
 *.cmd           text eol=crlf
 
 # Binary files should be left untouched
+*.exe           binary
 *.jar           binary
 *.zip           binary
 *.png           binary
@@ -28,3 +29,5 @@
 *.db            binary
 *.sqlite        binary
 *.sqlite3       binary
+# Fixtures sind byteweise Vergleichsdateien - die Zeilenenden gehoeren dazu
+terranova/tests/fixtures/** -text

@@ -1,0 +1,69 @@
+# -------------------------------------------------------------------------------------------------
+# ChatControl supports dynamic, high performance variables you create! They can be used across
+# the plugin, for example in formatting your chat or death messages. Currently, the folder
+# variables/ stores all custom variables in each separate yml file.
+#
+# Variables can not only be used to display information, but because you can write your own full
+# code in JavaScript to display them, they can also do whatever you would wish for your
+# players/server, such as sneaking in code to send sounds or spawn monsters.
+#
+# Coding this variable requires a little bit of JavaScript knowledge, see the link below.
+#
+# For documentation and help, please see this link:
+# https://docs.mineacademy.org/chatcontrol/javascript-variables
+# -------------------------------------------------------------------------------------------------
+#
+# Where should this variable be used?
+#
+# FORMAT = used in your formats with {syntax}, players cannot use it
+# MESSAGE = players can use it with [syntax] in their chat messages
+Type: format
+
+# The key you can later use in formats. Do not use brackets. 
+# Put the variable name here such as my_variable and you'll be able to call it with {my_variable}.
+Key: player_item_in_hand
+
+# The value the key will be replaced to. This uses JavaScript, you can use 
+# "player" to get the player, if available.
+#
+# TIP: Enable Performance.Support_Variables_In_Variables in settings.yml to support variables here.
+Value: |-
+  // A valid JavaScript code follows below. You can use the "player" variable to get
+  // Bukkit's player instance, and "audience" to get our FoundationPlayer.
+
+  function displayName() {
+
+    // Player can be null for console or discord
+    if (!audience.isPlayer())
+      return "None";
+
+    // Player can be null for console or discord
+    var item = player.getItemInHand();
+
+    if (item == null || item.getType() == Java.type("org.bukkit.Material").AIR)
+      return "Air";
+
+    var metadata = item.getItemMeta();
+    var displayName = metadata.getDisplayName();
+
+    // If the item has meta data and a custom name, show that name instead
+    // unless the item contains fake colour codes (added via an anvil etc)
+    if (metadata != null && metadata.hasDisplayName() && !displayName.match(/(&#[a-fA-F0-9]{6}|&[a-fA-F0-9rRk-oK-O])/))
+      return displayName;
+
+    // We use a class that is packed in Spigot server's JAR to capitalize our item
+    var wordUtils = Java.type("org.apache.commons.lang.WordUtils");
+    var name = item.getType().name().toLowerCase().replace('_', ' ').replace('_', ' ');
+
+    // Return the item name deducted from the items type, capitalized
+    return wordUtils.capitalize(name);
+  }
+
+  displayName();
+
+# What JavaScript condition must return true for this variable to show?
+# You can put variables in here to get replaced.
+Sender_Condition: ''
+
+# What permission must the message sender have in order for this variable to display to him?
+Sender_Permission: ''

@@ -6,71 +6,94 @@
 *.iml
 out/
 
-# Altes Arbeitsverzeichnis
-run/
-
 # ---------------------------------------------------------------------------
-# server/ IST der Arbeitsordner und wird versioniert: Plugin-Jars, Plugin-
-# Configs, Serverconfig und start.bat gehoeren ins Repository.
+# Die drei festen Server liegen unter servers/. Versioniert ist dort nur, was
+# einem Server wirklich gehoert: seine server.properties und die Configs
+# seiner Plugins.
 #
-# Ausgenommen ist alles, was zur Laufzeit entsteht oder heruntergeladen wird.
-# Faustregel: was start.bat, Paper oder ein Plugin selbst wiederherstellen
-# kann, wird nicht committet.
+# Alles andere legt scripts/sync-servers.ps1 aus templates/ hinein - Paper,
+# die gemeinsamen Configs und die Plugin-Jars. Jedes Jar liegt damit genau
+# einmal im Repository, naemlich in templates/.
+#
+# Faustregel: was start.bat, sync-servers.ps1, Paper oder ein Plugin selbst
+# wiederherstellen kann, wird nicht committet.
 # ---------------------------------------------------------------------------
 
-# Von start.bat heruntergeladen und angelegt
-server/mariadb/
+# Rust-Baustelle
+terranova/target/
+
+# Von start.bat heruntergeladen und angelegt: MariaDB und Redis samt Daten
+runtime/
+
+# Aus templates/ in die Server kopiert
+servers/*/*.jar
+servers/*/plugins/*.jar
+servers/*/plugins/PlaceholderAPI/expansions/
+servers/*/config/
+servers/*/server.properties
+# Liste dessen, was terranova sync hierher kopiert hat
+servers/*/.terranova-sync.json
+servers/*/eula.txt
+servers/*/bukkit.yml
+servers/*/spigot.yml
+
+# Dungeons: entstehen aus templates/mining und werden nach 24 h verworfen
+servers/mining-*/
+
+# Velocity: das Secret ist der einzige Schutz der Backends und gehoert nicht
+# ins Repository. Das Velocity-Jar dagegen schon - es ist keine Kopie aus
+# templates/, sondern das einzige Exemplar, und ohne es startet ein frischer
+# Klon nicht.
+proxy/forwarding.secret
+proxy/logs/
+proxy/lang/
 
 # Von Paper heruntergeladen oder erzeugt
-server/cache/
-server/libraries/
-server/versions/
-server/logs/
-server/world/
-server/world_nether/
-server/world_the_end/
-server/usercache.json
-server/*.log
-server/.console_history
-server/.paper/
-
-# Abgeloest: MariaDB, Datenbankanlage und Sync laufen jetzt in start.bat
-server/plugins/Interconnect/
-server/plugins/Interconnect-*.jar
+**/cache/
+**/libraries/
+**/versions/
+**/logs/
+servers/*/world/
+servers/*/world_nether/
+servers/*/world_the_end/
+templates/*/world/
+**/usercache.json
+**/.console_history
+**/.paper/
+*.log
 
 # Heruntergeladene Abhaengigkeiten und Uebersetzungen der Plugins
-server/plugins/**/libs/
-server/plugins/**/lib/
-server/plugins/**/translations/
+**/plugins/**/libs/
+**/plugins/**/lib/
+**/plugins/**/translations/
 
 # Von BountyfulSeas zur Laufzeit aus dem eigenen Jar ausgepackt
-server/plugins/BountyfulSeas/bin/
+**/plugins/BountyfulSeas/bin/
 
 # Laufzeitausgabe der Plugins
-server/plugins/**/logs/
-server/plugins/**/*.log
-server/plugins/**/*.log.lck
-server/plugins/**/.assetCache/
-server/plugins/**/.deobfCachedPacks/
-server/plugins/**/packsquash/
-server/plugins/**/.cache/
-server/plugins/**/.meta/
-server/plugins/bStats/
-server/plugins/spark/
-server/plugins/faststats/
+**/plugins/**/*.log
+**/plugins/**/*.log.lck
+**/plugins/**/.assetCache/
+**/plugins/**/.deobfCachedPacks/
+**/plugins/**/packsquash/
+**/plugins/**/.cache/
+**/plugins/**/.meta/
+**/plugins/bStats/
+**/plugins/spark/
+**/plugins/faststats/
 
 # Lokale Datenbanken (die echten Daten liegen in MariaDB)
-server/plugins/**/*.db
-server/plugins/**/*.sqlite
-server/plugins/**/*.mv.db
+**/plugins/**/*.db
+**/plugins/**/*.sqlite
+**/plugins/**/*.mv.db
 
 # Generierte Ausgabe einzelner Plugins
 # Von BountyfulSeas aus den Fischdefinitionen erzeugt. Wird bei jedem Start
 # neu geschrieben und vergibt custom_model_data neu, was bei parallelem
 # Arbeiten Konflikte und doppelte IDs erzeugt hat. Die Quelle sind die
 # Dateien unter BountyfulSeas/fishes - neue Items dort eintragen.
-server/plugins/Nexo/items/bountyfulseas/fish.yml
-server/plugins/Nexo/pack/pack.zip
-server/plugins/Pl3xMap/web/tiles/
-server/plugins/FastAsyncWorldEdit/history/
-server/plugins/FastAsyncWorldEdit/clipboard/
+**/plugins/Nexo/items/bountyfulseas/fish.yml
+**/plugins/Nexo/pack/pack.zip
+**/plugins/Pl3xMap/web/tiles/
+**/plugins/FastAsyncWorldEdit/history/
+**/plugins/FastAsyncWorldEdit/clipboard/

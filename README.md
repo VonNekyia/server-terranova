@@ -1,73 +1,413 @@
 # server-terranova
 
-Der Entwicklungsserver von Terranova. Das Repository **ist** der Server:
-Plugin-Jars, Plugin-Configs, Serverconfig und der Starter liegen unter
-`server/` und werden versioniert. Wer klont, hat einen lauffähigen Server.
+Das Terranova-Netzwerk. Das Repository **ist** das Netzwerk: Serverconfigs,
+Plugin-Configs, Plugin-Jars, die Vorlagen und das Programm, das alles startet,
+liegen hier und werden versioniert. Wer klont, hat ein lauffähiges Netzwerk.
 
 ## Starten
 
 ```
-server\start.bat
+start.bat
 ```
 
-Doppelklick genügt. Beim ersten Start lädt das Skript einmalig MariaDB
-herunter (ca. 87 MB), richtet das Datenverzeichnis ein und legt die
-Datenbanken an. Danach startet Paper.
+Doppelklick genügt. Beim ersten Start lädt Terranova einmalig MariaDB
+(ca. 87 MB) und Redis (ca. 4 MB) herunter, prüft ihre Prüfsummen, richtet die
+Datenverzeichnisse ein und legt die Datenbanken an. Danach bestückt es die
+Server aus `templates/` und fährt Proxy, main, build und farm hoch.
 
-Voraussetzung ist eine installierte Java-Laufzeit. Getestet mit Java 25
-und Java 26.
+Das Fenster ist nur **Zuschauer**: es zeigt, was der Supervisor tut. **Strg+C**
+fährt das Netzwerk sauber herunter; noch einmal Strg+C schließt nur das Fenster
+und lässt das Netzwerk weiterlaufen. Was beim Schließen des Fensters passiert,
+steht in `terranova.yml` unter `dashboard.on_window_close`.
 
-## Was start.bat übernimmt
+Die Server selbst haben **kein eigenes Fenster** mehr. An ihre Konsole kommt
+man mit `terranova console <name>` oder über das Dashboard — von überall, auch
+aus einem zweiten Terminal.
 
-Die Datenbank läuft bewusst im Starter und nicht in einem Plugin. Paper
-liest `server.properties` und die Plugins ihre eigenen Configs, bevor ein
-Plugin überhaupt geladen werden könnte — nur so steht MariaDB schon beim
-allerersten Start bereit.
+Voraussetzung ist eine Java-Laufzeit. Getestet mit Java 25 und 26. Mit
+`TERRANOVA_JAVA=<Pfad zu java.exe>` lässt sich eine bestimmte erzwingen.
 
-1. MariaDB besorgen (einmalig) und das Datenverzeichnis initialisieren
-2. MariaDB auf Port `13306` starten
-3. Datenbanken und den Benutzer `minecraft` anlegen
-4. Paper starten
-5. MariaDB nach dem Beenden sauber herunterfahren
+### Linux
 
-Port `13306` statt `3306`, damit eine lokal installierte MySQL/MariaDB
-nicht kollidiert. Zugangsdaten für lokale Entwicklung: `minecraft` /
-`minecraft`. Datenbankzugriff mit einem externen Client wie HeidiSQL oder
-DBeaver auf `127.0.0.1:13306`.
+```
+./start.sh
+```
+
+oder gleich `bin/terranova start`. Dieselben Befehle, dieselbe
+`terranova.yml`, derselbe Supervisor — nur darunter arbeitet eine andere
+Prozessverwaltung: statt der Windows-API liest Terranova dort `/proc`, und
+zum Stoppen gibt es mit `SIGTERM` einen Weg, den es unter Windows nicht gibt.
+
+Anders als unter Windows lädt Terranova hier **nichts** herunter. MariaDB und
+Redis kommen aus der Distribution:
+
+```
+sudo apt install mariadb-server redis-server
+```
+
+Fehlt eines von beiden, sagt Terranova beim Start, wie es hereinkommt. Das
+Datenverzeichnis unter `runtime/` gehört trotzdem Terranova; eine
+Systeminstanz auf 3306 bleibt unberührt.
+
+Unter `bin/` liegt nur die Windows-Programmdatei — eine je System einzuchecken
+hieße, sie bei jeder Änderung doppelt zu pflegen. `start.sh` baut die
+Linux-Fassung deshalb beim ersten Mal selbst, sofern Rust installiert ist.
+Fertige Binaries für x86_64 und aarch64 fallen ansonsten in der CI an.
+
+### Nur das Nötigste
+
+```
+start_minimal.bat
+```
+
+Datenbanken, Proxy und `main` — sonst nichts. `build`, `farm` und die Dungeons
+bleiben aus; zusammen belegen die rund acht Gigabyte, und auf einem knappen
+Rechner ist das der Unterschied zwischen spielbar und nicht. Dahinter steckt
+kein zweiter Startweg, nur `terranova start main`: jeder Servername hinter
+`start` grenzt ein, was hochfährt.
+
+Nachziehen geht jederzeit und ohne Neustart des Netzwerks:
+
+```
+terranova restart build
+```
+
+Der tägliche Neustart um vier rührt nur an, was auch läuft — aus einem
+schmalen Start wird über Nacht also kein vollständiger.
+
+## Die Server
+
+| Server | Port | Speicher | Was drauf liegt |
+| --- | --- | --- | --- |
+| Proxy | **25565** | 512 MB | Velocity, der Eingang |
+| `main` | 25566 | 4 GB | die gewachsene Welt: Nations, BetonQuest, Nexo, Pl3xMap, BountyfulSeas, Citizens, Proficisci |
+| `build` | 25567 | 2 GB | Bauserver, Kreativ, flache Welt |
+| `farm` | 25568 | 2 GB | Farmserver |
+| `mining-1` … `mining-8` | 25571 … | 2 GB | Dungeons, auf Zuruf geöffnet |
+
+Nur der Proxy ist von außen erreichbar. Die Server binden auf `127.0.0.1` —
+wer direkt auf 25566 will, müsste schon auf der Maschine sein.
+
+## Befehle
+
+```
+terranova start [--detach]     hochfahren (ohne --detach: zusehen)
+terranova start <name...>      nur diese Server hochfahren
+terranova stop [name...]       alles oder einzelne Knoten herunterfahren
+terranova restart <name>       stoppen, bestücken, starten
+terranova status               was läuft
+terranova console <name>       Konsole mitlesen und Befehle eintippen
+terranova logs <name> [-n N]   die letzten Zeilen
+terranova cmd <name> <befehl>  einen Befehl schicken
+terranova dashboard            Oberfläche im Browser öffnen
+
+terranova mine open [anzahl]   Dungeons öffnen (--slot N für einen bestimmten)
+terranova mine close <n>       schließen
+terranova mine list            was offen ist
+terranova mine reap            abgelaufene abräumen (--dry-run zeigt nur)
+
+terranova sync [name...]       Server aus templates/ bestücken
+terranova doctor               prüfen, ob alles startklar ist
+```
+
+`bin\terranova.exe` liegt im Repository; wer es oft braucht, legt den Ordner in
+den PATH. Ohne `--root` sucht Terranova die `terranova.yml` selbst — über `bin\`
+oder vom Arbeitsverzeichnis aufwärts.
+
+### Dungeons
+
+```
+terranova mine open 3
+```
+
+Ein Dungeon ist eine Kopie von `templates\mining` auf einem eigenen Port. Die
+acht Plätze stehen fest in `proxy\velocity.toml`; geöffnet wird nur, was
+gebraucht wird. Ein eingetragener, nicht laufender Server stört Velocity nicht —
+ein Verbindungsversuch gibt dann nur eine Fehlermeldung.
+
+Ein Dungeon bleibt **24 Stunden** offen und übersteht dabei auch einen
+Neustart des Netzwerks: er wird beim nächsten Start wieder hochgefahren
+(`mines.resume`). Abgeräumt wird er vom Supervisor selbst, im Takt von
+`schedule.reap_every`.
+
+Gelöscht heißt: Verzeichnis weg, das nächste `open` legt eine frische Welt an.
+Ein noch laufender Dungeon wird übersprungen, `--stop-running` beendet ihn
+vorher sauber. Abgeräumt wird über `servers\.trash`: erst umbenennen, dann
+löschen — das Umbenennen scheitert, solange jemand Dateien offen hält, also
+kann kein halb gelöschter Dungeon entstehen.
+
+## Aufbau
+
+```
+start.bat                   ruft nur bin\terranova.exe start auf
+start.sh                    dasselbe unter Linux
+bin/terranova.exe           das Programm, versioniert
+terranova.yml               was läuft, mit wie viel Speicher, auf welchem Port
+terranova/                  sein Quelltext (Rust)
+  src/win.rs                Prozesse, Ports, Zeit — über die Windows-API
+  src/unix.rs               dasselbe über /proc und Signale
+  src/docker.rs             dasselbe über Container
+proxy/
+  velocity.toml             versioniert
+  velocity-*.jar            versioniert
+  forwarding.secret         nicht versioniert
+servers/
+  main/  build/  farm/      versioniert: nur die Plugin-Configs
+  mining-*/                 nicht versioniert
+templates/
+  common/                   Paper, gemeinsame Configs, gemeinsame Plugin-Jars
+  main/                     was nur main braucht
+  mining/                   die Dungeon-Vorlage
+runtime/                    MariaDB, Redis, Geheimnisse, Zustand — nichts davon versioniert
+```
+
+### Wo ein Plugin hingehört
+
+Jedes Jar liegt **genau einmal** im Repository, nämlich unter `templates/`.
+Terranova kopiert es vor jedem Start in die Server. Ein Plugin-Update ist damit
+eine Datei, kein viermaliges Kopieren — und beim nächsten Neustart ist es
+überall wirksam.
+
+**`templates/common/plugins/`** — was auf jedem Server laufen soll:
+TerranovaLib, LuckPerms, HuskSync, PlaceholderAPI samt Expansions, Vault, TAB,
+ChatControl, InteractiveChat, packetevents, FastAsyncWorldEdit, WorldGuard.
+
+**`templates/main/plugins/`** — was an mains Welt und seinen Tabellen hängt:
+Nations, Proficisci, PlayerActionAdapter, BountyfulSeas, Nexo, Citizens,
+Pl3xMap, BetonQuest. Pl3xMap (Port 8080) und Nexos Packserver (8082) binden
+feste Ports und können ohnehin nur einmal laufen.
+
+**`templates/mining/plugins/`** — bewusst dünn, damit ein Dungeon schnell
+startet. Hier landet BountyfulMining aus dem Schwesterrepository:
+
+```
+cd ..\BountyfulMining
+gradle deployToTestServer
+```
+
+Was Terranova hierher kopiert hat, steht in `.terranova-sync.json`. Fällt ein
+Jar aus der Vorlage weg, verschwindet die Kopie — sonst lägen nach einem
+Plugin-Update die alte und die neue Fassung nebeneinander im Serververzeichnis.
+
+Versioniert ist unter `servers/` nur, was ein Server wirklich selbst besitzt:
+die Configs seiner Plugins. Paper, die gemeinsamen Configs, alle Jars und auch
+`server.properties` entstehen beim Start aus `templates/`.
 
 ## Eine Datenbank hinzufügen
 
-Eine Zeile in `server/start.bat`:
+Eine Zeile in `terranova.yml`:
 
-```bat
-set "DATABASES=network nations betonquest chatcontrol interactivechat luckperms proficisci"
+```yaml
+deps:
+  mariadb:
+    databases: [nations, betonquest, ..., husksync]
 ```
 
-Der Name muss zu dem passen, was das Plugin in seiner Config erwartet.
+Der Name muss zu dem passen, was das Plugin in seiner Config erwartet — die
+Zuordnung steht als Kommentar direkt darüber. Beim nächsten Start wird sie
+angelegt.
+
+Zugangsdaten für lokale Entwicklung: `minecraft` / `minecraft` auf
+`127.0.0.1:13306`. Redis läuft ohne Passwort auf `127.0.0.1:6379`. Beide binden
+nur auf `127.0.0.1`, und der Benutzer hat Rechte je Datenbank statt auf alles.
+
+## Weiterleitung
+
+Velocity läuft mit **modern forwarding**: der Proxy prüft gegen Mojang und
+reicht UUID und Skin signiert weiter, das Backend prüft die Signatur gegen
+`proxy\forwarding.secret`. Die Server laufen deshalb auf `online-mode=false` —
+das Secret ist ihr einziger Schutz, und darum steht es nicht im Repository.
+Terranova erzeugt es beim ersten Start und trägt es in jede
+`config\paper-global.yml` ein.
+
+## Sauber stoppen
+
+Gestoppt wird über die Konsole des Servers, nicht über das Betriebssystem:
+Terranova schreibt `stop` in seine Eingabe und wartet. Erst wenn das nicht
+ankommt, geht es über RCON; erst danach hart — und das steht dann als `FEHLER`
+im Protokoll, denn dabei gehen ungespeicherte Chunks verloren.
+
+Ein sauberer Stopp hinterlässt im Serverlog `All chunks are saved` und
+`All RegionFile I/O tasks to complete`.
+
+RCON läuft je Server auf Port + 100 (main 25666, build 25667, farm 25668,
+Dungeons 25671+), nur auf `127.0.0.1`; das Passwort steht in
+`runtime\rcon.secret`.
+
+Unter Linux kommt vor dem harten Abschuss noch ein Schritt dazu: ein `SIGTERM`.
+Die JVM behandelt es über ihre Abschalthaken, Paper speichert die Welt und
+beendet sich selbst — das klappt auch dann noch, wenn die Konsole schon nicht
+mehr annimmt. Unter Windows gibt es dieses Mittel nicht: eine JVM hat dort kein
+Fenster mit Nachrichtenschleife, `CloseMainWindow` läuft ins Leere, und
+`taskkill` ohne `/F` verweigert den Dienst.
+
+### Wenn der Supervisor abstürzt
+
+Die Server laufen weiter. Das ist Absicht: sie mit ihm sterben zu lassen hieße,
+jeden Absturz in einen gleichzeitigen harten Abschuss von main, den Dungeons
+und MariaDB zu verwandeln.
+
+Der nächste `terranova start` **übernimmt** sie: er erkennt sie am Port, prüft
+PID, Erzeugungszeit und Programmdatei, redet dann über RCON mit ihnen und liest
+ihre Konsole aus `logs/latest.log` mit. `terranova status` zeigt sie als
+*übernommen*. Der nächste Neustart macht sie wieder zu eigenen.
+
+Sitzt auf einem Port etwas Fremdes, wird es weder angefasst noch beendet — der
+Knoten steht dann auf `conflict`.
+
+### Täglicher Neustart
+
+Macht der Supervisor selbst, laut `schedule.daily_restart` um 04:00: eine
+Ansage in den Chat, dann nacheinander mit zwei Minuten Abstand stoppen,
+bestücken und wieder starten. Dungeons bleiben unberührt. Eine geplante Aufgabe
+in Windows braucht es dafür nicht mehr — falls noch eine von früher existiert,
+warnt `terranova doctor` davor.
+
+## Dashboard
+
+```
+terranova dashboard
+```
+
+Öffnet die Oberfläche im Browser: Zustand, Start und Stopp, Live-Konsole mit
+Eingabe, Dungeons. Sie steckt in der Programmdatei und benutzt ausschließlich
+dieselbe Schnittstelle wie die CLI — sie kann also nichts, was die CLI nicht
+auch kann.
+
+Ein Lesezeichen auf <http://127.0.0.1:25590/> tut es genauso — `terranova
+dashboard` öffnet nur den Browser.
+
+Die Schnittstelle hört nur auf `127.0.0.1` und verlangt ein Token aus
+`runtime\terranova\api.token`. Die CLI schickt es als Kopfzeile, der Browser
+bekommt beim Abruf der Seite ein Sitzungsplätzchen (`HttpOnly`,
+`SameSite=Strict`, 30 Tage). Das Token steht nie in der Adresszeile. Wer die
+Seite bekommt, sitzt an diesem Rechner: der `Host`-Kopf muss `127.0.0.1` oder
+`localhost` sein, eine fremde Webseite kann die Antwort nicht lesen, und ihre
+eigenen Anfragen tragen das Plätzchen wegen `SameSite=Strict` nicht mit.
+
+## Website und Karte
+
+```
+terranova status
+```
+
+zeigt unter **Web** beides:
+
+| | |
+| --- | --- |
+| `website` | die öffentliche Seite aus `website/`, ausgeliefert auf **8081** |
+| `karte` | Pl3xMap in `main` auf **8080** |
+
+Die Seite in `website/` ist ein fertiger Build ohne eigenen Server. Terranova
+liefert sie deshalb selbst aus — daneben noch nginx zu pflegen wäre ein
+zweites Ding, das jemand starten, aktuell halten und überwachen müsste. Pfade
+wie `/impressum` gibt es nur im Browser: was keine Dateiendung hat und nicht
+existiert, bekommt `index.html` (eine fehlende `.png` bleibt 404). Alles unter
+`static/` trägt seinen Inhalt im Namen und wird als unveränderlich
+ausgeliefert, der Rest über ETag — ohne das ginge das acht Megabyte große
+Hintergrundbild bei jedem Seitenwechsel neu über die Leitung.
+
+Voreingestellt ist `bind: 127.0.0.1`, also **nur dieser Rechner**. Für den
+öffentlichen Betrieb steht in `terranova.yml` unter `web.site.bind` ein
+`0.0.0.0` — davor gehört dann etwas, das TLS spricht und Last abfängt; dieser
+Server kann beides nicht, und `terranova doctor` sagt das auch.
+
+Die Karte gehört uns nicht: Pl3xMap bringt seinen eigenen Webserver mit und
+läuft **im Prozess von `main`**. Terranova kann sie also nicht starten oder
+stoppen, nur nachsehen — und dafür drei Zustände unterscheiden, die sonst
+alle gleich aussehen:
+
+| Zustand | Heißt |
+| --- | --- |
+| `ready` | antwortet, mit der Zahl der gerenderten Welten |
+| `waiting` | `main` läuft (noch) nicht — kein Fehler |
+| `down` | `main` läuft, aber auf 8080 antwortet niemand |
+
+`terranova doctor` vergleicht außerdem `web.map.port` mit dem, was in
+`servers/main/plugins/Pl3xMap/config.yml` unter `internal-webserver` steht.
+Gehen die auseinander, zeigt das Dashboard sonst eine Karte als tot an, die
+läuft.
+
+## Docker
+
+`terranova.yml` kennt `runtime: auto | native | docker`. `auto` heißt immer
+`native` — unter Windows wie unter Linux. Docker wird nie gewählt, nur weil es
+installiert ist: wer native Prozesse erwartet, soll nicht plötzlich Container
+bekommen.
+
+Für `runtime: docker` muss in Docker Desktop **host networking** eingeschaltet
+sein (Settings → Resources → Network → Enable host networking → Apply &
+restart). Ohne das landen die Container in einem eigenen Netz, in dem
+`127.0.0.1:13306` auf den Container selbst zeigt, und keine Datenbank­verbindung
+eines Plugins käme an. `terranova doctor` prüft das mit einem echten Container,
+bevor irgendetwas startet.
+
+Zweiter Punkt: die WSL2-Maschine bekommt ohne Zutun die Hälfte des
+Arbeitsspeichers. Für mehr als etwa zwei Dungeons braucht es in
+`%USERPROFILE%\.wslconfig`
+
+```ini
+[wsl2]
+memory=28GB
+```
+
+und danach `wsl --shutdown`. Auch das rechnet `doctor` vor.
+
+## Speicher
+
+Proxy 0,5 + main 4 + build 2 + farm 2 macht 8,5 GB Grundlast. Bei 32 GB im
+Rechner bleiben etwa 20 GB für Dungeons, also rund **acht** gleichzeitig — was
+genau den acht Plätzen in `velocity.toml` entspricht.
 
 ## Mitarbeiten
 
-Änderungen an Plugin-Configs, Plugin-Jars und Serverconfig werden ganz
-normal committet — sie liegen alle unter `server/`.
+Änderungen an Serverconfigs, Plugin-Configs, Plugin-Jars und `terranova.yml`
+werden ganz normal committet. Wer am Quelltext arbeitet:
+
+```
+cd terranova
+cargo test
+cargo build --release
+copy target\release\terranova.exe ..\bin\
+```
+
+Die gebaute Datei gehört mit ins Repository — wie die Jars auch, damit ein
+Klon ohne Rust-Werkzeug lauffähig ist.
 
 Nicht im Repository, weil zur Laufzeit erzeugt oder heruntergeladen:
 
 | Pfad | Warum |
 | --- | --- |
-| `server/world*/` | Weltdaten, ständig in Bewegung |
-| `server/mariadb/` | lädt `start.bat` selbst |
-| `server/libraries/`, `server/cache/`, `server/versions/` | lädt Paper selbst |
-| `server/logs/` | Laufzeitausgabe |
-| `server/plugins/**/libs/`, `**/translations/` | laden die Plugins selbst |
-| `server/plugins/**/*.db`, `*.mv.db` | lokale Dateidatenbanken; die echten Daten liegen in MariaDB |
+| `runtime/` | MariaDB, Redis, Geheimnisse, Zustand |
+| `servers/*/*.jar`, `servers/*/plugins/*.jar` | Kopien aus `templates/` |
+| `servers/*/config/`, `server.properties`, `eula.txt`, `bukkit.yml`, `spigot.yml` | dito; enthalten Forwarding-Secret und RCON-Passwort |
+| `servers/mining-*/` | Dungeons, nach 24 h ohnehin weg |
+| `proxy/forwarding.secret` | Geheimnis |
+| `**/world/`, `**/logs/`, `**/cache/`, `**/libraries/`, `**/versions/` | Laufzeitdaten |
+| `terranova/target/` | Bauverzeichnis |
 
-Faustregel: was `start.bat`, Paper oder ein Plugin selbst wiederherstellen
-kann, gehört nicht ins Repository.
+Faustregel: was Terranova, Paper oder ein Plugin selbst wiederherstellen kann,
+gehört nicht ins Repository.
 
 ## Historie
 
-Das Repository hieß früher `Interconnect`, nach einem eigenen Plugin, das
-MariaDB startete und Plugins aus versionierten Ordnern in den Server
-kopierte. Beides erledigt jetzt `start.bat`, bevor die JVM läuft. Damit
-entfielen das 244 MB große Shaded-Jar samt Git-LFS, der Gradle-Build und
-der Zwang, den Server nach dem Einspielen neuer Jars zweimal zu starten.
+Bis September 2026 war das hier ein einzelner Paper-Server unter `server/`.
+Daraus wurde ein Netzwerk aus Velocity plus vier Servern; mains Welt und
+Configs sind unverändert mitgewandert.
+
+Zwischendurch stand **CloudNet 4** als Orchestrierung dahinter. Es ist wieder
+herausgeflogen: seine Stärken sind Cluster über mehrere Maschinen und
+Autoscaling nach Spielerzahl, und beides braucht dieses Netzwerk nicht. Übrig
+blieben die Nachteile — keine stabile 4.x, ein Launcher, der sich bei jedem
+Start aus dem *beta*-Zweig aktualisiert, die Forderung nach genau Java 25, und
+eine Weiterleitung, die bei jedem Start auf *legacy* zurückgeschrieben wurde.
+
+Danach liefen sieben PowerShell-Skripte. Die taten es, aber die Logik steckte
+in Windows-Skripten, jeder Server brauchte ein eigenes sichtbares Fenster, und
+sauber herunterfahren ging nur über einen Umweg: die JVM hat kein Fenster mit
+Nachrichtenschleife, `CloseMainWindow()` läuft ins Leere und `taskkill` ohne
+`/F` verweigert den Dienst. Jetzt besitzt Terranova die Konsolen selbst, und
+`stop` ist wieder das, was es sein sollte.
+
+Davor hieß das Repository `Interconnect`, nach einem eigenen Plugin, das
+MariaDB startete und Plugins aus versionierten Ordnern in den Server kopierte.

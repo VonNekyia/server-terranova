@@ -1,0 +1,516 @@
+//! Prueft, ob das Netzwerk startklar ist - bevor es jemand startet.
+
+use std::fmt::Write as _;
+use std::fs;
+use std::process::{Command, Stdio};
+
+use crate::config::{Config, Runtime};
+use crate::paths::Paths;
+use crate::{paperyml, sys};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Level {
+    Ok,
+    Warn,
+    Fail,
+}
+
+impl Level {
+    fn mark(self) -> &'static str {
+        match self {
+            Level::Ok => "  ok  ",
+            Level::Warn => " warn ",
+            Level::Fail => "FEHLER",
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Check {
+    pub level: Level,
+    pub what: String,
+    pub detail: String,
+}
+
+pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
+    let mut c = Vec::new();
+    let mut add = |level, what: &str, detail: String| {
+        c.push(Check {
+            level,
+            what: what.to_string(),
+            detail,
+        })
+    };
+
+    add(
+        Level::Ok,
+        "Konfiguration",
+        format!("{} - Laufzeit {}", paths.config().display(), cfg.runtime()),
+    );
+
+    // --- Java ---------------------------------------------------------------
+    if cfg.runtime() == Runtime::Native {
+        let java = std::env::var("TERRANOVA_JAVA").unwrap_or_else(|_| cfg.java.path.clone());
+        match java_version(&java) {
+            Some(v) => add(Level::Ok, "Java", format!("{java}: {v}")),
+            None => add(
+                Level::Fail,
+                "Java",
+                format!("'{java}' laesst sich nicht ausfuehren - installieren oder TERRANOVA_JAVA setzen"),
+            ),
+        }
+    }
+
+    // --- Vorlagen ------------------------------------------------------------
+    let common = paths.common();
+    if !common.is_dir() {
+        add(
+            Level::Fail,
+            "Vorlagen",
+            format!("{} fehlt", common.display()),
+        );
+    } else {
+        let paper = fs::read_dir(&common)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .find(|n| n.starts_with("paper-") && n.ends_with(".jar"));
+        match paper {
+            Some(j) => add(Level::Ok, "Paper", j),
+            None => add(
+                Level::Fail,
+                "Paper",
+                format!("kein paper-*.jar in {}", common.display()),
+            ),
+        }
+        for f in ["server.properties", "eula.txt"] {
+            if !common.join(f).is_file() {
+                add(
+                    Level::Warn,
+                    "Vorlagen",
+                    format!("templates/common/{f} fehlt"),
+                );
+            }
+        }
+        if !common.join("config").join("paper-global.yml").is_file() {
+            add(
+                Level::Warn,
+                "Vorlagen",
+                "templates/common/config/paper-global.yml fehlt - ohne sie keine Weiterleitung"
+                    .into(),
+            );
+        }
+    }
+    for name in cfg.servers.keys() {
+        let t = paths.template(name);
+        if !t.is_dir() {
+            add(
+                Level::Warn,
+                "Vorlagen",
+                format!("templates/{name}/ fehlt - der Server bekommt die gemeinsame Vorlage"),
+            );
+        }
+    }
+    if !paths.template(&cfg.mines.template).is_dir() {
+        add(
+            Level::Fail,
+            "Vorlagen",
+            format!(
+                "templates/{}/ fehlt - ohne sie kein Dungeon",
+                cfg.mines.template
+            ),
+        );
+    }
+
+    // --- Proxy ---------------------------------------------------------------
+    let proxy_dir = paths.resolve(&cfg.proxy.dir);
+    let vjar = fs::read_dir(&proxy_dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .find(|n| n.starts_with("velocity") && n.ends_with(".jar"));
+    match vjar {
+        Some(j) => add(Level::Ok, "Velocity", j),
+        None => add(
+            Level::Fail,
+            "Velocity",
+            format!("kein velocity-*.jar in {}", proxy_dir.display()),
+        ),
+    }
+
+    let vtoml = proxy_dir.join("velocity.toml");
+    match fs::read_to_string(&vtoml) {
+        Err(e) => add(
+            Level::Fail,
+            "velocity.toml",
+            format!("{}: {e}", vtoml.display()),
+        ),
+        Ok(text) => {
+            let v = parse_velocity(&text);
+            match v.forwarding.as_deref() {
+                Some("modern") => add(Level::Ok, "Weiterleitung", "modern forwarding".into()),
+                Some(other) => add(
+                    Level::Warn,
+                    "Weiterleitung",
+                    format!("player-info-forwarding-mode = \"{other}\" - bei online-mode=false auf den Servern sollte hier modern stehen"),
+                ),
+                None => add(Level::Warn, "Weiterleitung", "player-info-forwarding-mode fehlt".into()),
+            }
+            let mut missing = Vec::new();
+            for name in cfg.servers.keys() {
+                if !v.servers.contains(name) {
+                    missing.push(name.clone());
+                }
+            }
+            for slot in 1..=cfg.mines.slots {
+                let n = crate::mines::name(slot);
+                if !v.servers.contains(&n) {
+                    missing.push(n);
+                }
+            }
+            if missing.is_empty() {
+                add(
+                    Level::Ok,
+                    "Servereintraege",
+                    format!("{} in velocity.toml", v.servers.len()),
+                );
+            } else {
+                add(
+                    Level::Fail,
+                    "Servereintraege",
+                    format!("in velocity.toml fehlen: {}", missing.join(", ")),
+                );
+            }
+        }
+    }
+
+    // --- Geheimnisse -----------------------------------------------------------
+    let fwd = proxy_dir.join("forwarding.secret");
+    if fwd.is_file() {
+        add(Level::Ok, "Forwarding-Secret", "vorhanden".into());
+    } else {
+        add(
+            Level::Warn,
+            "Forwarding-Secret",
+            "fehlt - wird beim naechsten Start erzeugt".into(),
+        );
+    }
+    for name in cfg.servers.keys() {
+        let pg = paths.server(name).join("config").join("paper-global.yml");
+        if pg.is_file() && !paperyml::has_secret(&fs::read_to_string(&pg).unwrap_or_default()) {
+            add(
+                Level::Warn,
+                "Weiterleitung",
+                format!(
+                    "{name}: kein Secret in config/paper-global.yml - 'terranova sync' setzt es"
+                ),
+            );
+        }
+    }
+
+    // --- Web ---------------------------------------------------------------
+    let site = &cfg.web.site;
+    let root = paths.root.join(&site.dir);
+    if site.port == 0 {
+        add(
+            Level::Ok,
+            "Website",
+            "abgeschaltet (web.site.port: 0)".into(),
+        );
+    } else if !root.join("index.html").is_file() {
+        add(
+            Level::Warn,
+            "Website",
+            format!(
+                "{} hat keine index.html - es wird nichts ausgeliefert",
+                root.display()
+            ),
+        );
+    } else {
+        add(
+            Level::Ok,
+            "Website",
+            format!("{} auf {}:{}", root.display(), site.bind, site.port),
+        );
+        if site.bind != "127.0.0.1" && site.bind != "localhost" {
+            add(
+                Level::Warn,
+                "Website",
+                format!(
+                    "gebunden an {} - die Seite ist aus dem Netz erreichbar. Davor gehoert                      etwas, das TLS spricht und Last abfaengt; dieser Server kann beides nicht.",
+                    site.bind
+                ),
+            );
+        }
+    }
+
+    // Die Karte gehoert Pl3xMap. Wir koennen nur pruefen, ob das, was in
+    // terranova.yml steht, zu dem passt, was das Plugin tatsaechlich tut -
+    // sonst zeigt das Dashboard eine Karte als tot an, die laeuft.
+    let map = &cfg.web.map;
+    if map.port == 0 {
+        add(Level::Ok, "Karte", "abgeschaltet (web.map.port: 0)".into());
+    } else if !cfg.servers.contains_key(&map.server) {
+        add(
+            Level::Fail,
+            "Karte",
+            format!(
+                "web.map.server: {} - diesen Server gibt es nicht",
+                map.server
+            ),
+        );
+    } else {
+        match crate::web::pl3xmap_webserver(&paths.server(&map.server)) {
+            None => add(
+                Level::Warn,
+                "Karte",
+                format!(
+                    "{}: plugins/Pl3xMap/config.yml nicht lesbar - laeuft das Plugin dort?",
+                    map.server
+                ),
+            ),
+            Some((false, _)) => add(
+                Level::Warn,
+                "Karte",
+                format!("{}: Pl3xMaps interner Webserver ist aus", map.server),
+            ),
+            Some((true, p)) if p != map.port => add(
+                Level::Fail,
+                "Karte",
+                format!(
+                    "web.map.port: {}, aber Pl3xMap horcht auf {p} ({}/plugins/Pl3xMap/config.yml)",
+                    map.port, map.server
+                ),
+            ),
+            Some((true, p)) => add(
+                Level::Ok,
+                "Karte",
+                format!("Pl3xMap in {} auf Port {p}", map.server),
+            ),
+        }
+    }
+
+    // --- Ports -----------------------------------------------------------------
+    let mut busy = Vec::new();
+    for (port, what) in ports_of(cfg) {
+        if let Some(pid) = sys::port_owner(port) {
+            let who = sys::image_name(pid).unwrap_or_else(|| format!("PID {pid}"));
+            busy.push(format!("{port} ({what}) belegt von {who}"));
+        }
+    }
+    if busy.is_empty() {
+        add(Level::Ok, "Ports", "alle frei".into());
+    } else {
+        add(
+            Level::Warn,
+            "Ports",
+            format!("{} - laeuft das Netzwerk schon?", busy.join("; ")),
+        );
+    }
+
+    // --- Docker ---------------------------------------------------------------
+    if cfg.runtime() == Runtime::Docker {
+        match crate::docker::Docker::new(paths, cfg).preflight() {
+            Ok(()) => add(Level::Ok, "Docker", "Host-Netzwerk funktioniert".into()),
+            Err(e) => add(Level::Fail, "Docker", e),
+        }
+        if let Some(mb) = crate::docker::mem_total_mb() {
+            let base: u32 =
+                cfg.proxy.memory.0 + cfg.servers.values().map(|s| s.memory.0).sum::<u32>();
+            // Grob: JVM braucht ueber dem Heap noch etwas, und die
+            // Datenbanken wollen auch leben.
+            let fits = (mb as i64 - i64::from(base) - 1536) / i64::from(cfg.mines.memory.0);
+            let detail = format!(
+                "{mb} MB in der Docker-Maschine, Grundlast {base} MB - Platz fuer etwa {} Dungeon(s)",
+                fits.max(0)
+            );
+            if fits < 1 {
+                add(Level::Fail, "Speicher", format!(
+                    "{detail}. In %USERPROFILE%\\.wslconfig eintragen: [wsl2] memory=28GB, dann wsl --shutdown"
+                ));
+            } else if fits < i64::from(cfg.mines.slots) {
+                add(Level::Warn, "Speicher", format!(
+                    "{detail}, aber {} Plaetze vorgesehen. Mehr geht ueber %USERPROFILE%\\.wslconfig: [wsl2] memory=28GB",
+                    cfg.mines.slots
+                ));
+            } else {
+                add(Level::Ok, "Speicher", detail);
+            }
+        }
+    }
+
+    // --- Reste aus der Skript-Zeit ----------------------------------------------
+    if paths.root.join("scripts").is_dir() {
+        add(
+            Level::Warn,
+            "Altlast",
+            "scripts/ gibt es noch - start.bat darf nicht parallel laufen, zwei Aufsichten streiten sich".into(),
+        );
+    }
+    if scheduled_task_exists("Terranova Neustart") {
+        add(
+            Level::Warn,
+            "Altlast",
+            "geplante Aufgabe 'Terranova Neustart' ist noch da - sie wuerde zusaetzlich zum eingebauten Zeitplan neu starten".into(),
+        );
+    }
+
+    c
+}
+
+pub fn render(checks: &[Check]) -> String {
+    let mut s = String::new();
+    for c in checks {
+        let _ = writeln!(s, "[{}] {:<18} {}", c.level.mark(), c.what, c.detail);
+    }
+    let fails = checks.iter().filter(|c| c.level == Level::Fail).count();
+    let warns = checks.iter().filter(|c| c.level == Level::Warn).count();
+    let _ = writeln!(
+        s,
+        "\n{fails} Fehler, {warns} Hinweise, {} geprueft",
+        checks.len()
+    );
+    s
+}
+
+pub fn worst(checks: &[Check]) -> Level {
+    if checks.iter().any(|c| c.level == Level::Fail) {
+        Level::Fail
+    } else if checks.iter().any(|c| c.level == Level::Warn) {
+        Level::Warn
+    } else {
+        Level::Ok
+    }
+}
+
+fn ports_of(cfg: &Config) -> Vec<(u16, String)> {
+    let mut v = vec![
+        (cfg.proxy.port, "proxy".to_string()),
+        (cfg.deps.mariadb.port, "mariadb".into()),
+        (cfg.deps.redis.port, "redis".into()),
+        (cfg.dashboard.port, "dashboard".into()),
+    ];
+    if cfg.web.site.port != 0 {
+        v.push((cfg.web.site.port, "website".into()));
+    }
+    for (name, s) in &cfg.servers {
+        v.push((s.port, name.clone()));
+    }
+    v
+}
+
+fn java_version(java: &str) -> Option<String> {
+    let mut cmd = Command::new(java);
+    cmd.arg("-version").stdin(Stdio::null());
+    let out = sys::hide_window(&mut cmd).output().ok()?;
+    // java -version schreibt nach stderr
+    let text = String::from_utf8_lossy(&out.stderr);
+    text.lines().next().map(|l| l.trim().to_string())
+}
+
+/// Ob noch eine geplante Windows-Aufgabe fuer den Neustart eingetragen ist.
+/// Den Neustart macht der Supervisor inzwischen selbst; eine uebrig
+/// gebliebene Aufgabe wuerde ein zweites Mal stoppen.
+#[cfg(windows)]
+fn scheduled_task_exists(name: &str) -> bool {
+    let mut cmd = Command::new("schtasks");
+    cmd.args(["/Query", "/TN", name])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    sys::hide_window(&mut cmd)
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+/// Unter Unix gibt es diese Aufgabe nicht - dort war der Neustart nie etwas
+/// anderes als der eigene Zeitplan.
+#[cfg(unix)]
+fn scheduled_task_exists(_name: &str) -> bool {
+    false
+}
+
+/// Was aus velocity.toml interessiert.
+#[derive(Debug, Default, PartialEq)]
+pub struct Velocity {
+    pub servers: Vec<String>,
+    pub forwarding: Option<String>,
+}
+
+/// Ein kleiner Blick in die TOML-Datei statt eines TOML-Parsers: gebraucht
+/// werden zwei Dinge, und die Datei gehoert Velocity.
+pub fn parse_velocity(text: &str) -> Velocity {
+    let mut v = Velocity::default();
+    let mut in_servers = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with('#') || line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') {
+            in_servers = line == "[servers]";
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let key = key.trim();
+        let value = value.trim().trim_matches(['"', '\'']);
+        if in_servers {
+            // try = ["main"] ist eine Liste, kein Server
+            if key != "try" && !value.starts_with('[') {
+                v.servers.push(key.to_string());
+            }
+        } else if key == "player-info-forwarding-mode" {
+            v.forwarding = Some(value.to_string());
+        }
+    }
+    v
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TOML: &str = r#"
+config-version = "2.9"
+bind = "0.0.0.0:25565"
+player-info-forwarding-mode = "modern"
+forwarding-secret-file = "forwarding.secret"
+
+[servers]
+	# Die drei festen Server.
+	main = "127.0.0.1:25566"
+	build = "127.0.0.1:25567"
+	mining-1 = "127.0.0.1:25571"
+	try = ["main"]
+
+[advanced]
+	compression-threshold = 256
+"#;
+
+    #[test]
+    fn liest_server_und_weiterleitung() {
+        let v = parse_velocity(TOML);
+        assert_eq!(v.forwarding.as_deref(), Some("modern"));
+        assert_eq!(v.servers, ["main", "build", "mining-1"]);
+    }
+
+    #[test]
+    fn die_echte_velocity_toml_passt_zur_config() {
+        // Gegen die Datei, die wirklich ausgeliefert wird.
+        let text = include_str!("../../proxy/velocity.toml");
+        let v = parse_velocity(text);
+        let cfg = Config::parse(crate::testutil::EXAMPLE_CONFIG).unwrap();
+        assert_eq!(v.forwarding.as_deref(), Some("modern"));
+        for name in cfg.servers.keys() {
+            assert!(v.servers.contains(name), "{name} fehlt in velocity.toml");
+        }
+        for slot in 1..=cfg.mines.slots {
+            let n = crate::mines::name(slot);
+            assert!(v.servers.contains(&n), "{n} fehlt in velocity.toml");
+        }
+    }
+}

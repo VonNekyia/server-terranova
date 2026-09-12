@@ -1,0 +1,122 @@
+# Baut und prueft die CLI auf beiden Systemen, auf denen sie laufen soll.
+#
+# Zwei Laeufe und nicht einer, weil sich hinter sys:: je nach Zielsystem eine
+# andere Datei verbirgt: win.rs geht ueber die Windows-API, unix.rs ueber
+# /proc und Signale. Was nur unter Windows uebersetzt, faellt sonst erst dem
+# auf, der es auf einem Server auspackt.
+#
+# Der Docker-Rueckhalt haengt an einem laufenden Docker und laesst sich hier
+# nicht sinnvoll pruefen.
+name: terranova
+
+on:
+  push:
+    paths:
+      - "terranova/**"
+      - "terranova.yml"
+      - "proxy/velocity.toml"
+      - "start.sh"
+      - ".github/workflows/terranova.yml"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: terranova
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust einrichten
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          rustup component add rustfmt clippy
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            terranova/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('terranova/Cargo.lock') }}
+
+      # Die Formatierung haengt nicht am System, deshalb nur hier.
+      - name: Formatierung
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Die Tests lesen terranova.yml und proxy/velocity.toml aus dem
+      # Repository: passen die Dungeon-Plaetze nicht mehr zusammen, faellt
+      # es hier auf und nicht erst beim Starten.
+      - name: Tests
+        run: cargo test
+
+      - name: Release bauen
+        run: cargo build --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terranova-windows-x64
+          path: terranova/target/release/terranova.exe
+
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terranova
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust einrichten
+        run: |
+          rustup update --no-self-update stable
+          rustup default stable
+          rustup component add clippy
+          rustup target add aarch64-unknown-linux-gnu
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            terranova/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('terranova/Cargo.lock') }}
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      # unix.rs liest Prozesszeiten aus /proc und sucht den Besitzer eines
+      # horchenden Ports ueber die Socket-Inode. Beides laesst sich nur hier
+      # pruefen, nicht auf einem Windows-Laeufer.
+      - name: Tests
+        run: cargo test
+
+      - name: Release bauen
+        run: cargo build --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terranova-linux-x64
+          path: terranova/target/release/terranova
+
+      # Fuer Server auf ARM - ein Raspberry Pi oder eine der guenstigen
+      # ARM-Instanzen. Nur gebaut, nicht getestet: der Laeufer ist x86.
+      - name: Linker fuer aarch64
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Release fuer aarch64 bauen
+        run: cargo build --release --target aarch64-unknown-linux-gnu
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terranova-linux-aarch64
+          path: terranova/target/aarch64-unknown-linux-gnu/release/terranova

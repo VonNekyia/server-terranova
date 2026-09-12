@@ -360,6 +360,12 @@ impl Supervisor {
 
     /// Startet einen Knoten, wenn er nicht ohnehin schon laeuft.
     pub fn start_node(self: &Arc<Self>, node: &Arc<Node>) -> io::Result<()> {
+        // Faehrt das Netzwerk herunter, startet nichts mehr. Sonst ueberholt
+        // ein Start, der noch in der Schleife steckte, den Shutdown - und der
+        // Server laeuft danach verwaist weiter, weil ihn niemand mehr stoppt.
+        if self.shutting_down() {
+            return Err(io::Error::other("das Netzwerk faehrt herunter"));
+        }
         {
             let mut g = node.lock();
             g.desired = true;
@@ -376,6 +382,14 @@ impl Supervisor {
 
         if self.adopt(node) {
             return Ok(());
+        }
+        // Zwischen dem Anfang dieser Funktion und hier kann ein Stopp
+        // gekommen sein - dann nicht mehr starten.
+        if self.shutting_down() || !node.lock().desired {
+            node.set_status(Status::Stopped);
+            return Err(io::Error::other(
+                "abgebrochen - der Knoten wurde inzwischen gestoppt",
+            ));
         }
         // Belegt, aber nicht von uns: nicht starten. Sonst scheitert der
         // Start am Port, der Waechter versucht es alle paar Sekunden neu -
@@ -525,14 +539,36 @@ impl Supervisor {
     /// Faehrt einen Knoten herunter: erst ueber seine eigene Konsole, dann
     /// ueber RCON, erst zuletzt hart.
     pub fn stop_node(self: &Arc<Self>, node: &Arc<Node>) -> bool {
-        {
+        let nothing_running = {
             let mut g = node.lock();
             g.desired = false;
             g.next_try = None;
             if g.status == Status::Stopped {
                 return true;
             }
-            g.status = Status::Stopping;
+            // In der Absturzschleife und beim Konflikt laeuft kein Prozess von
+            // uns. Wer dort den Stopp-Befehl schickt und auf ein Ende wartet,
+            // wartet auf etwas, das nie kommt - bei main 120, 30 und 90
+            // Sekunden hintereinander, und MariaDB und Redis sind erst danach
+            // dran. So hing unter Linux das ganze Herunterfahren. Beim Konflikt
+            // ginge der Befehl obendrein an das fremde Programm auf dem Port.
+            let idle = matches!(g.status, Status::Crashloop | Status::Conflict)
+                || (g.pid.is_none() && g.status != Status::Starting);
+            g.status = if idle {
+                Status::Stopped
+            } else {
+                Status::Stopping
+            };
+            idle
+        };
+        if nothing_running {
+            node.changed.notify_all();
+            self.log(format!(
+                "{}: lief nicht - nichts zu stoppen",
+                node.spec.name
+            ));
+            self.save_state();
+            return true;
         }
         let name = &node.spec.name;
         let timeout = node.spec.stop_timeout;
@@ -686,6 +722,10 @@ impl Supervisor {
         }
 
         for node in &to_start {
+            if self.shutting_down() {
+                self.log("Start abgebrochen - das Netzwerk faehrt herunter");
+                break;
+            }
             // Auch ohne Vorlage: server.properties und paper-global.yml
             // entstehen hier, und in beiden steckt ein Geheimnis.
             if let Err(e) = syncer.sync(&node.spec, false) {
@@ -814,6 +854,22 @@ impl Supervisor {
         }
         for h in handles {
             let _ = h.join();
+        }
+
+        // Was waehrenddessen noch hochkam: ein Start, der schon unterwegs war,
+        // als der Shutdown begann, taucht in der Liste oben nicht auf.
+        let late: Vec<Arc<Node>> = self
+            .all()
+            .into_iter()
+            .filter(|n| {
+                matches!(
+                    n.spec.kind,
+                    NodeKind::Proxy | NodeKind::Server | NodeKind::Mine(_)
+                ) && n.status() != Status::Stopped
+            })
+            .collect();
+        for node in late {
+            self.stop_node(&node);
         }
 
         for name in ["redis", "mariadb"] {

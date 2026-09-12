@@ -568,7 +568,11 @@ impl Config {
                 name: name.clone(),
                 kind: NodeKind::Server,
                 dir: paths.server(name),
-                template: Some(name.clone()),
+                // Ein fester Server wird nicht bestueckt: was in seinem
+                // Verzeichnis liegt, ist was laeuft, und es ist versioniert.
+                // Nur seine server.properties und paper-global.yml entstehen
+                // beim Start neu - da gehoeren Geheimnisse hinein.
+                template: None,
                 port: s.port,
                 rcon_port: Some(self.rcon_port(s.port)),
                 memory: s.memory,
@@ -583,7 +587,7 @@ impl Config {
     pub fn mine_node(&self, paths: &Paths, slot: u8) -> NodeSpec {
         let name = crate::mines::name(slot);
         let port = self.mines.base_port + u16::from(slot);
-        let dir = paths.server(&name);
+        let dir = paths.mine(&name);
         // Bestueckt wird aus der Vorlage, aus der er auch entstanden ist -
         // die steht in seiner Markierung, sobald beim Oeffnen eine andere
         // gewaehlt wurde. Ohne Markierung gilt die Vorgabe.
@@ -751,7 +755,7 @@ mod tests {
             ("mining-3", 25573, Some(25673))
         );
         assert_eq!(m.motd.as_deref(), Some("Terranova Mine 3"));
-        assert_eq!(m.dir, p.root.join("servers").join("mining-3"));
+        assert_eq!(m.dir, p.root.join("servers_dynamic").join("mining-3"));
         assert!(c.node(&p, "mining-9").is_none(), "nur 8 Plaetze");
         assert!(c.node(&p, "proxy").unwrap().is_proxy());
     }

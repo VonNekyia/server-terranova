@@ -459,7 +459,7 @@ fn status(paths: &Paths, cfg: &Config) -> ExitCode {
         for node in std::iter::once(cfg.proxy_node(paths))
             .chain(cfg.server_nodes(paths))
             .chain(
-                mines::existing(&paths.servers(), cfg.mines.slots)
+                mines::existing(&paths.dynamic(), cfg.mines.slots)
                     .into_iter()
                     .map(|s| cfg.mine_node(paths, s)),
             )
@@ -815,7 +815,7 @@ fn sync_cmd(paths: &Paths, cfg: &Config, which: &[String], dry_run: bool) -> Exi
     let mut nodes = Vec::new();
     if which.is_empty() {
         nodes.extend(cfg.server_nodes(paths));
-        for slot in mines::existing(&paths.servers(), cfg.mines.slots) {
+        for slot in mines::existing(&paths.dynamic(), cfg.mines.slots) {
             nodes.push(cfg.mine_node(paths, slot));
         }
     } else {

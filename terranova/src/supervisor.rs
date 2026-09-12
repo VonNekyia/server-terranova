@@ -202,6 +202,11 @@ impl Supervisor {
                 Box::new(d)
             }
         };
+        // Einmalig: Dungeons aus der Zeit, als sie noch unter servers/ lagen.
+        for name in mines::migrate(&paths.servers(), &paths.dynamic()) {
+            eprintln!("[terranova] {name} nach servers_dynamic/ verschoben");
+        }
+
         let (rcon_password, _) = secrets::load_or_create(&paths.rcon_secret())?;
         fs::create_dir_all(paths.state_dir())?;
         let log_file = fs::OpenOptions::new()
@@ -237,7 +242,7 @@ impl Supervisor {
         for spec in self.cfg.server_nodes(&self.paths) {
             n.insert(spec.name.clone(), Node::new(spec));
         }
-        for slot in mines::existing(&self.paths.servers(), self.cfg.mines.slots) {
+        for slot in mines::existing(&self.paths.dynamic(), self.cfg.mines.slots) {
             let spec = self.cfg.mine_node(&self.paths, slot);
             n.insert(spec.name.clone(), Node::new(spec));
         }
@@ -638,8 +643,8 @@ impl Supervisor {
 
         // Offene Dungeons wieder hochfahren, solange sie nicht abgelaufen sind.
         if self.cfg.mines.resume && only.is_empty() {
-            for slot in mines::existing(&self.paths.servers(), self.cfg.mines.slots) {
-                let dir = self.paths.server(&mines::name(slot));
+            for slot in mines::existing(&self.paths.dynamic(), self.cfg.mines.slots) {
+                let dir = self.paths.mine(&mines::name(slot));
                 // Geschlossen heisst geschlossen - der wartet nur noch aufs
                 // Abraeumen.
                 if mines::closed_at(&dir).is_some() {
@@ -664,13 +669,13 @@ impl Supervisor {
         }
 
         for node in &to_start {
-            if node.spec.template.is_some() {
-                if let Err(e) = syncer.sync(&node.spec, false) {
-                    self.log(format!(
-                        "{}: Bestuecken fehlgeschlagen: {e}",
-                        node.spec.name
-                    ));
-                }
+            // Auch ohne Vorlage: server.properties und paper-global.yml
+            // entstehen hier, und in beiden steckt ein Geheimnis.
+            if let Err(e) = syncer.sync(&node.spec, false) {
+                self.log(format!(
+                    "{}: Einrichten fehlgeschlagen: {e}",
+                    node.spec.name
+                ));
             }
             if let Err(e) = self.start_node(node) {
                 self.log(format!("{}: Start fehlgeschlagen: {e}", node.spec.name));
@@ -847,7 +852,7 @@ impl Supervisor {
     /// seine Welt und wird weiter aus der Vorlage bestueckt, aus der er
     /// entstanden ist.
     pub fn open_mine(self: &Arc<Self>, slot: u8, template: Option<&str>) -> io::Result<Arc<Node>> {
-        let dir = self.paths.server(&mines::name(slot));
+        let dir = self.paths.mine(&mines::name(slot));
         if !dir.exists() {
             let chosen = template.unwrap_or(&self.cfg.mines.template);
             let from = self.paths.template(chosen);
@@ -898,17 +903,14 @@ impl Supervisor {
     /// denken muss.
     pub fn restart_node(self: &Arc<Self>, node: &Arc<Node>) {
         self.stop_node(node);
-        if node.spec.template.is_some() {
-            match sync::Syncer::new(&self.paths, &self.cfg).and_then(|s| s.sync(&node.spec, false))
-            {
-                Ok(r) if !r.pruned.is_empty() => self.log(format!(
-                    "{}: {} veraltete Datei(en) entfernt",
-                    node.spec.name,
-                    r.pruned.len()
-                )),
-                Ok(_) => {}
-                Err(e) => self.log(format!("{}: Bestuecken: {e}", node.spec.name)),
-            }
+        match sync::Syncer::new(&self.paths, &self.cfg).and_then(|s| s.sync(&node.spec, false)) {
+            Ok(r) if !r.pruned.is_empty() => self.log(format!(
+                "{}: {} veraltete Datei(en) entfernt",
+                node.spec.name,
+                r.pruned.len()
+            )),
+            Ok(_) => {}
+            Err(e) => self.log(format!("{}: Einrichten: {e}", node.spec.name)),
         }
         if let Err(e) = self.start_node(node) {
             self.log(format!("{}: Start fehlgeschlagen: {e}", node.spec.name));
@@ -937,11 +939,11 @@ impl Supervisor {
                 return;
             }
         };
-        let open: Vec<(String, u16)> = mines::existing(&self.paths.servers(), self.cfg.mines.slots)
+        let open: Vec<(String, u16)> = mines::existing(&self.paths.dynamic(), self.cfg.mines.slots)
             .into_iter()
             // Ein geschlossener Dungeon kommt nicht wieder hoch - dann soll der
             // Proxy auch niemanden mehr dorthin schicken.
-            .filter(|slot| mines::closed_at(&self.paths.server(&mines::name(*slot))).is_none())
+            .filter(|slot| mines::closed_at(&self.paths.mine(&mines::name(*slot))).is_none())
             .map(|slot| {
                 (
                     mines::name(slot),

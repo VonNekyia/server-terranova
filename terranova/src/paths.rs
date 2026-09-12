@@ -87,11 +87,25 @@ impl Paths {
         self.servers().join(name)
     }
 
+    /// Die dynamischen Server - Dungeons.
+    ///
+    /// Sie liegen getrennt von den festen, weil sie das Gegenteil von ihnen
+    /// sind: sie entstehen aus einer Vorlage, leben einen Tag und
+    /// verschwinden wieder. Nichts davon gehoert ins Repository, und wer
+    /// unter servers/ nachsieht, soll dort nur finden, woran gearbeitet wird.
+    pub fn dynamic(&self) -> PathBuf {
+        self.root.join("servers_dynamic")
+    }
+
+    pub fn mine(&self, name: &str) -> PathBuf {
+        self.dynamic().join(name)
+    }
+
     /// Abgelaufene Dungeons werden erst hierher verschoben und dann geloescht.
     /// Das Verschieben scheitert, solange ein Prozess Dateien offen haelt - so
     /// kann kein halb geloeschter Dungeon entstehen.
     pub fn trash(&self) -> PathBuf {
-        self.servers().join(".trash")
+        self.dynamic().join(".trash")
     }
 
     pub fn runtime(&self) -> PathBuf {

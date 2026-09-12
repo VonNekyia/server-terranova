@@ -66,7 +66,10 @@ proxy:
   port: 25565
   memory: 512M
 
-# Vorlage je Server: templates/<name>, Verzeichnis: servers/<name>
+# Die festen Server. Verzeichnis: servers/<name> - und dort liegt auch alles,
+# was sie brauchen. Bestueckt werden sie nicht: was im Verzeichnis liegt, ist
+# was laeuft. Nur server.properties und config/paper-global.yml entstehen beim
+# Start neu, aus den .dist-Dateien daneben - in beiden steckt ein Geheimnis.
 servers:
   main:  { port: 25566, memory: 4G, stop_timeout: 180s }
   build: { port: 25567, memory: 2G }
@@ -75,6 +78,8 @@ servers:
 # RCON je Server auf Port + 100, nur auf 127.0.0.1
 rcon_offset: 100
 
+# Die dynamischen Server. Verzeichnis: servers_dynamic/mining-N, bestueckt aus
+# templates/common und templates/<template>.
 mines:
   template: mining
   # Wie viele Dungeons gleichzeitig offen sein duerfen. Die Eintraege in

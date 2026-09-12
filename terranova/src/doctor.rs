@@ -103,15 +103,54 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
             );
         }
     }
+    // Ein fester Server hat keine Vorlage: er traegt sein Paper und seine
+    // Plugins selbst, versioniert unter servers/<name>/. Geprueft wird
+    // deshalb, ob das auch wirklich dort liegt - und ob die beiden Quellen da
+    // sind, aus denen beim Start die Dateien mit den Geheimnissen entstehen.
+    let mut feste_ok = Vec::new();
     for name in cfg.servers.keys() {
-        let t = paths.template(name);
-        if !t.is_dir() {
+        let dir = paths.server(name);
+        let mut ok = true;
+        let has_paper = fs::read_dir(&dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .any(|n| n.starts_with("paper-") && n.ends_with(".jar"));
+        if !has_paper {
             add(
-                Level::Warn,
-                "Vorlagen",
-                format!("templates/{name}/ fehlt - der Server bekommt die gemeinsame Vorlage"),
+                Level::Fail,
+                "Fester Server",
+                format!("kein paper-*.jar in servers/{name}/ - ohne es startet er nicht"),
             );
+            ok = false;
         }
+        for (rel, wozu) in [
+            ("server.properties.dist", "Port, RCON und MOTD"),
+            ("config/paper-global.yml.dist", "die Weiterleitung"),
+        ] {
+            if !dir
+                .join(rel.replace('/', std::path::MAIN_SEPARATOR_STR))
+                .is_file()
+            {
+                add(
+                    Level::Warn,
+                    "Fester Server",
+                    format!("servers/{name}/{rel} fehlt - dann schreibt Terranova {wozu} nicht"),
+                );
+                ok = false;
+            }
+        }
+        if ok {
+            feste_ok.push(name.clone());
+        }
+    }
+    if !feste_ok.is_empty() {
+        add(
+            Level::Ok,
+            "Feste Server",
+            format!("{} - Paper und Quellen vollstaendig", feste_ok.join(", ")),
+        );
     }
     if !paths.template(&cfg.mines.template).is_dir() {
         add(
@@ -183,7 +222,7 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
                 );
             }
 
-            let offen = crate::mines::existing(&paths.servers(), cfg.mines.slots).len();
+            let offen = crate::mines::existing(&paths.dynamic(), cfg.mines.slots).len();
             let eingetragen = v
                 .servers
                 .iter()

@@ -19,9 +19,9 @@ pub fn reap(sup: &Arc<Supervisor>, dry_run: bool, stop_running: bool) -> Vec<Str
     let now = mines::now_unix();
     let lifetime = sup.cfg.mines.lifetime.0;
 
-    for slot in mines::existing(&sup.paths.servers(), sup.cfg.mines.slots) {
+    for slot in mines::existing(&sup.paths.dynamic(), sup.cfg.mines.slots) {
         let name = mines::name(slot);
-        let dir = sup.paths.server(&name);
+        let dir = sup.paths.mine(&name);
         let node = sup.node(&name);
         let running = node.as_ref().is_some_and(|n| n.status() != Status::Stopped);
 
@@ -68,7 +68,7 @@ pub fn reap(sup: &Arc<Supervisor>, dry_run: bool, stop_running: bool) -> Vec<Str
 }
 
 fn delete(sup: &Arc<Supervisor>, name: &str) -> std::io::Result<()> {
-    let dir = sup.paths.server(name);
+    let dir = sup.paths.mine(name);
     let trash = sup.paths.trash();
     fs::create_dir_all(&trash)?;
     // Erst umbenennen: haelt noch jemand eine Datei offen, scheitert das
@@ -95,7 +95,7 @@ mod tests {
     fn verschieben_und_loeschen() {
         let root = crate::testutil::tempdir("reap");
         let paths = Paths::new(&root);
-        let dir = paths.server("mining-2");
+        let dir = paths.mine("mining-2");
         fs::create_dir_all(dir.join("world")).unwrap();
         fs::write(dir.join("world").join("level.dat"), b"welt").unwrap();
 

@@ -143,7 +143,7 @@ holt `mine open --slot N` ihn samt seiner Welt zurück.
 Gelöscht heißt: Verzeichnis weg, das nächste `open` legt eine frische Welt an.
 `terranova mine reap` von Hand überspringt einen laufenden Dungeon —
 `--stop-running` beendet ihn vorher sauber. Der Supervisor und der Knopf im
-Dashboard tun das von sich aus, sonst käme nie einer an die Reihe. Abgeräumt wird über `servers\.trash`: erst umbenennen, dann
+Dashboard tun das von sich aus, sonst käme nie einer an die Reihe. Abgeräumt wird über `servers_dynamic\.trash`: erst umbenennen, dann
 löschen — das Umbenennen scheitert, solange jemand Dateien offen hält, also
 kann kein halb gelöschter Dungeon entstehen.
 
@@ -162,28 +162,38 @@ proxy/
   velocity.toml             versioniert
   velocity-*.jar            versioniert
   forwarding.secret         nicht versioniert
-servers/
-  main/  build/  farm/      versioniert: nur die Plugin-Configs
-  mining-*/                 nicht versioniert
-templates/
+servers/                    die festen Server, vollstaendig versioniert
+  main/  build/  farm/      Paper, Plugin-Jars, Configs - was da liegt, laeuft
+    server.properties.dist  Quelle; die fertige Datei traegt das RCON-Passwort
+    config/paper-global.yml.dist   Quelle; die fertige traegt das Secret
+servers_dynamic/            die Dungeons, nicht versioniert
+  mining-*/                 entstehen aus templates/, nach 24 h weg
+templates/                  nur noch fuer Dungeons
   common/                   Paper, gemeinsame Configs, gemeinsame Plugin-Jars
-  main/                     was nur main braucht
   mining/                   die Dungeon-Vorlage
 runtime/                    MariaDB, Redis, Geheimnisse, Zustand — nichts davon versioniert
 ```
 
 ### Wo ein Plugin hingehört
 
-Jedes Jar liegt **genau einmal** im Repository, nämlich unter `templates/`.
-Terranova kopiert es vor jedem Start in die Server. Ein Plugin-Update ist damit
-eine Datei, kein viermaliges Kopieren — und beim nächsten Neustart ist es
-überall wirksam.
+Bei einem **festen Server** dorthin, wo es laufen soll: `servers/main/plugins/`.
+Das Jar wird committet, und damit ist es überall dort, wo das Repository ist.
+Terranova kopiert nichts in einen festen Server hinein — was im Verzeichnis
+liegt, ist was läuft. Wer ein Plugin aktualisiert, ersetzt die Datei und
+committet sie.
 
-**`templates/common/plugins/`** — was auf jedem Server laufen soll:
+Dass dasselbe Jar dann in `main`, `build` und `farm` liegt, kostet im
+Repository nichts: Git speichert nach Inhalt, drei gleiche Dateien sind ein
+Objekt. Auf der Platte lagen sie ohnehin schon dreimal.
+
+Bei einem **Dungeon** dagegen weiter unter `templates/` — er entsteht ja bei
+jedem Öffnen neu.
+
+**`templates/common/plugins/`** — was in jedem Dungeon laufen soll, heute:
 TerranovaLib, LuckPerms, HuskSync, PlaceholderAPI samt Expansions, Vault, TAB,
 ChatControl, InteractiveChat, packetevents, FastAsyncWorldEdit, WorldGuard.
 
-**`templates/main/plugins/`** — was an mains Welt und seinen Tabellen hängt:
+**`servers/main/plugins/`** — was an mains Welt und seinen Tabellen hängt:
 Nations, Proficisci, PlayerActionAdapter, BountyfulSeas, Nexo, Citizens,
 Pl3xMap, BetonQuest. Pl3xMap (Port 8080) und Nexos Packserver (8082) binden
 feste Ports und können ohnehin nur einmal laufen.
@@ -196,13 +206,19 @@ cd ..\BountyfulMining
 gradle deployToTestServer
 ```
 
-Was Terranova hierher kopiert hat, steht in `.terranova-sync.json`. Fällt ein
-Jar aus der Vorlage weg, verschwindet die Kopie — sonst lägen nach einem
-Plugin-Update die alte und die neue Fassung nebeneinander im Serververzeichnis.
+Was Terranova in einen Dungeon kopiert hat, steht dort in
+`.terranova-sync.json`. Fällt ein Jar aus der Vorlage weg, verschwindet die
+Kopie — sonst lägen nach einem Plugin-Update die alte und die neue Fassung
+nebeneinander.
 
-Versioniert ist unter `servers/` nur, was ein Server wirklich selbst besitzt:
-die Configs seiner Plugins. Paper, die gemeinsamen Configs, alle Jars und auch
-`server.properties` entstehen beim Start aus `templates/`.
+### Die zwei Dateien, die nicht ins Repository gehören
+
+In `server.properties` steht das RCON-Passwort, in `config/paper-global.yml`
+das Forwarding-Secret. Beide entstehen bei jedem Start neu — aus
+`server.properties.dist` und `config/paper-global.yml.dist` daneben, die
+versioniert sind. Wer den MOTD oder eine Paper-Einstellung dauerhaft ändern
+will, ändert die `.dist`-Datei; Port, RCON-Port und das Geheimnis setzt
+Terranova beim Schreiben selbst.
 
 ## Eine Datenbank hinzufügen
 
@@ -390,9 +406,9 @@ Nicht im Repository, weil zur Laufzeit erzeugt oder heruntergeladen:
 | Pfad | Warum |
 | --- | --- |
 | `runtime/` | MariaDB, Redis, Geheimnisse, Zustand |
-| `servers/*/*.jar`, `servers/*/plugins/*.jar` | Kopien aus `templates/` |
-| `servers/*/config/`, `server.properties`, `eula.txt`, `bukkit.yml`, `spigot.yml` | dito; enthalten Forwarding-Secret und RCON-Passwort |
-| `servers/mining-*/` | Dungeons, nach 24 h ohnehin weg |
+| `servers/*/server.properties` | enthält das RCON-Passwort; entsteht aus `.dist` |
+| `servers/*/config/paper-global.yml` | enthält das Forwarding-Secret; entsteht aus `.dist` |
+| `servers_dynamic/` | Dungeons, nach 24 h ohnehin weg |
 | `proxy/forwarding.secret` | Geheimnis |
 | `**/world/`, `**/logs/`, `**/cache/`, `**/libraries/`, `**/versions/` | Laufzeitdaten |
 | `terranova/target/` | Bauverzeichnis |

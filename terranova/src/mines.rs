@@ -166,6 +166,37 @@ pub fn opened_at(dir: &Path) -> Option<u64> {
         .map(|d| d.as_secs())
 }
 
+/// Holt Dungeons aus ihrer alten Ecke.
+///
+/// Frueher lagen sie unter servers/ neben den festen Servern. Wer ein
+/// bestehendes Netzwerk aktualisiert, soll dabei weder seine offenen Dungeons
+/// verlieren noch sie von Hand verschieben muessen - also passiert das einmal
+/// von selbst. Gibt die Namen zurueck, die umgezogen sind.
+///
+/// Was nicht umziehen laesst, weil drueben schon etwas gleichen Namens liegt,
+/// bleibt liegen: lieber ein Verzeichnis zu viel als eine ueberschriebene Welt.
+pub fn migrate(old_dir: &Path, new_dir: &Path) -> Vec<String> {
+    let mut moved = Vec::new();
+    let Ok(entries) = fs::read_dir(old_dir) else {
+        return moved;
+    };
+    for e in entries.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        if parse_name(&name).is_none() || !e.path().is_dir() {
+            continue;
+        }
+        let to = new_dir.join(&name);
+        if to.exists() {
+            continue;
+        }
+        if fs::create_dir_all(new_dir).is_ok() && fs::rename(e.path(), &to).is_ok() {
+            moved.push(name);
+        }
+    }
+    moved.sort();
+    moved
+}
+
 /// Nummern aller vorhandenen Dungeon-Verzeichnisse, aufsteigend.
 pub fn existing(servers_dir: &Path, slots: u8) -> Vec<u8> {
     let mut v: Vec<u8> = fs::read_dir(servers_dir)
@@ -304,6 +335,34 @@ mod tests {
         // Kein Fehler, aber auch keine Markierung aus dem Nichts.
         mark_closed(d, 9_000).unwrap();
         assert_eq!(closed_at(d), None);
+    }
+
+    #[test]
+    fn dungeons_ziehen_einmal_um() {
+        let root = crate::testutil::tempdir("mine-migrate");
+        let old = root.join("servers");
+        let new = root.join("servers_dynamic");
+        for n in ["mining-1", "mining-4", "main", ".trash"] {
+            fs::create_dir_all(old.join(n)).unwrap();
+        }
+        // Drueben liegt schon einer - der bleibt, wo er ist.
+        fs::create_dir_all(new.join("mining-4")).unwrap();
+        fs::write(new.join("mining-4").join("welt.txt"), "drueben").unwrap();
+        fs::write(old.join("mining-4").join("welt.txt"), "hier").unwrap();
+
+        assert_eq!(migrate(&old, &new), ["mining-1"]);
+        assert!(new.join("mining-1").is_dir());
+        assert!(!old.join("mining-1").exists());
+        // Feste Server bleiben, wo sie sind.
+        assert!(old.join("main").is_dir());
+        assert!(!new.join("main").exists());
+        // Und die vorhandene Welt drueben wurde nicht ueberschrieben.
+        assert_eq!(
+            fs::read_to_string(new.join("mining-4").join("welt.txt")).unwrap(),
+            "drueben"
+        );
+        // Beim zweiten Lauf gibt es nichts mehr zu tun.
+        assert!(migrate(&old, &new).is_empty());
     }
 
     #[test]

@@ -655,17 +655,49 @@ pub fn provision(paths: &Paths, cfg: &Config, runtime: crate::config::Runtime) -
 /// Programmdatei. Auf dieser Maschine laeuft daneben ein eigenstaendiger
 /// MariaDB-Dienst auf 3306, den ein pauschales Beenden mit erwischt haette.
 pub fn stop_mariadb(paths: &Paths, cfg: &Config) -> bool {
-    quiet(&mut Command::new(mariadb_client(
-        paths,
-        &cfg.deps.mariadb.version,
-    )))
-    .args(["-h", "127.0.0.1", "-P"])
-    .arg(cfg.deps.mariadb.port.to_string())
-    .args(["-u", "root", "--protocol=tcp", "-e", "SHUTDOWN"])
-    .stdout(Stdio::null())
-    .stderr(Stdio::null())
-    .status()
-    .is_ok_and(|s| s.success())
+    let mut cmd = Command::new(mariadb_client(paths, &cfg.deps.mariadb.version));
+    quiet(&mut cmd)
+        .args(["-h", "127.0.0.1", "-P"])
+        .arg(cfg.deps.mariadb.port.to_string())
+        .args([
+            "-u",
+            "root",
+            "--protocol=tcp",
+            "--connect-timeout=5",
+            "-e",
+            "SHUTDOWN",
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    // Mit Frist: haengt der Client, etwa weil die Datenbank eine Verbindung
+    // annimmt und dann nicht mehr antwortet, soll nicht das ganze
+    // Herunterfahren mithaengen. Danach greift in stop_node der naechste Weg.
+    status_within(&mut cmd, Duration::from_secs(20))
+}
+
+/// Startet ein Programm und wartet hoechstens `limit` auf sein Ende.
+///
+/// true nur bei erfolgreichem Ende innerhalb der Frist. Wer sie ueberzieht,
+/// wird beendet - ein Hilfsprogramm, das haengt, darf den Supervisor nicht
+/// mit festhalten.
+fn status_within(cmd: &mut Command, limit: Duration) -> bool {
+    let Ok(mut child) = cmd.spawn() else {
+        return false;
+    };
+    let deadline = Instant::now() + limit;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return status.success(),
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return false;
+            }
+        }
+    }
 }
 
 pub fn stop_redis(port: u16) -> bool {
@@ -851,5 +883,48 @@ mod port_tests {
         assert!(port_answers(port), "wer lauscht, muss antworten");
         drop(listener);
         assert!(!port_answers(port), "nach dem Schliessen ist der Port frei");
+    }
+}
+
+#[cfg(test)]
+mod frist_tests {
+    use super::*;
+
+    #[cfg(windows)]
+    fn exits_with(code: i32) -> Command {
+        let mut c = Command::new("cmd");
+        c.args(["/C", &format!("exit {code}")]);
+        c
+    }
+    #[cfg(unix)]
+    fn exits_with(code: i32) -> Command {
+        let mut c = Command::new("sh");
+        c.args(["-c", &format!("exit {code}")]);
+        c
+    }
+    #[cfg(windows)]
+    fn hangs() -> Command {
+        let mut c = Command::new("powershell");
+        c.args(["-NoProfile", "-Command", "Start-Sleep -Seconds 30"]);
+        c
+    }
+    #[cfg(unix)]
+    fn hangs() -> Command {
+        let mut c = Command::new("sleep");
+        c.arg("30");
+        c
+    }
+
+    #[test]
+    fn ergebnis_innerhalb_der_frist() {
+        assert!(status_within(&mut exits_with(0), Duration::from_secs(10)));
+        assert!(!status_within(&mut exits_with(3), Duration::from_secs(10)));
+    }
+
+    #[test]
+    fn haengendes_programm_wird_nach_der_frist_beendet() {
+        let t = Instant::now();
+        assert!(!status_within(&mut hangs(), Duration::from_millis(500)));
+        assert!(t.elapsed() < Duration::from_secs(10), "{:?}", t.elapsed());
     }
 }

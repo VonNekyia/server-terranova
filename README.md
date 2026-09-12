@@ -429,7 +429,7 @@ Nicht im Repository, weil zur Laufzeit erzeugt oder heruntergeladen:
 | `runtime/` | MariaDB, Redis, Geheimnisse, Zustand |
 | `servers/*/server.properties` | enthält das RCON-Passwort; entsteht aus `.dist` |
 | `servers/*/config/paper-global.yml` | enthält das Forwarding-Secret; entsteht aus `.dist` |
-| `servers/*/ops.json`, `whitelist.json`, `banned-*.json` | hängt an Spielern, nicht am Server; Paper legt sie leer an |
+| `servers/*/whitelist.json`, `banned-*.json` | hängt an diesem Netzwerk; Paper legt sie leer an |
 | `servers/*/plugins/TAB/playerdata.yml` | was TAB sich zu Spielern merkt |
 | `servers/*/plugins/Proficisci/storage/` | aus mains Welt gerechnet |
 | `servers/*/plugins/BountyfulSeas/water_regions.bin` | aus mains Welt gescannt |

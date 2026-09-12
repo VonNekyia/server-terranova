@@ -15,15 +15,12 @@ use std::io;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt as _;
-
 use sha2::{Digest, Sha256};
 
 use crate::backend::{Backend, Discovered, AIKAR, CONSOLE_FLAGS};
 use crate::config::{Config, JavaFlags, NodeKind, NodeSpec};
 use crate::paths::Paths;
-use crate::win;
+use crate::sys;
 
 pub struct Docker {
     project: String,
@@ -33,8 +30,7 @@ pub struct Docker {
 fn docker() -> Command {
     let mut c = Command::new("docker");
     c.stdin(Stdio::null());
-    #[cfg(windows)]
-    c.creation_flags(win::CREATE_NO_WINDOW);
+    sys::hide_window(&mut c);
     c
 }
 

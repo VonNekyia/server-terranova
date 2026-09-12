@@ -331,6 +331,7 @@ name = "terranova"
 version = "0.1.0"
 dependencies = [
  "lexopt",
+ "libc",
  "serde",
  "serde-saphyr",
  "serde_json",

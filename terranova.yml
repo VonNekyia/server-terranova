@@ -6,9 +6,9 @@
 # ---------------------------------------------------------------------------
 
 # auto | native | docker
-# auto heisst unter Windows native. Docker wird nie gewaehlt, nur weil es
-# installiert ist - wer native Prozesse erwartet, soll nicht ploetzlich
-# Container bekommen.
+# auto heisst nativ - unter Windows wie unter Linux. Docker wird nie
+# gewaehlt, nur weil es installiert ist: wer native Prozesse erwartet, soll
+# nicht ploetzlich Container bekommen.
 runtime: auto
 
 java:
@@ -19,6 +19,15 @@ java:
   # aikar = die Aikar-Flags wie bisher in network.ps1, none = nur -Xms/-Xmx
   flags: aikar
 
+# MariaDB und Redis. Unter Windows bringt Terranova beide selbst mit und
+# laedt sie beim ersten Start herunter - es gibt dort keine Paketverwaltung,
+# auf die man sich verlassen koennte.
+#
+# Unter Linux andersherum: dort kommen beide aus der Distribution
+# (apt install mariadb-server redis-server), und Terranova benutzt, was
+# installiert ist. version, sha256 und windows_commit sind dann ohne
+# Bedeutung. Das Datenverzeichnis unter runtime/ gehoert trotzdem Terranova -
+# eine Systeminstanz auf 3306 bleibt unberuehrt.
 deps:
   mariadb:
     version: "11.4.5"

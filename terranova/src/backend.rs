@@ -10,12 +10,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt as _;
-
 use crate::config::{Config, NodeKind, NodeSpec};
 use crate::paths::Paths;
-use crate::win;
+use crate::sys;
 
 /// Die Flags aus network.ps1, unveraendert uebernommen.
 pub const AIKAR: &[&str] = &[
@@ -71,11 +68,11 @@ pub trait Backend: Send + Sync {
 
     /// Wer horcht schon auf dem Port des Knotens?
     fn discover(&self, node: &NodeSpec) -> Option<Discovered> {
-        let pid = win::port_owner(node.port)?;
+        let pid = sys::port_owner(node.port)?;
         Some(Discovered {
             pid,
-            created: win::created(pid),
-            image: win::image_name(pid).unwrap_or_default(),
+            created: sys::created(pid),
+            image: sys::image_name(pid).unwrap_or_default(),
         })
     }
 
@@ -87,7 +84,7 @@ pub trait Backend: Send + Sync {
 
     /// Letztes Mittel.
     fn kill(&self, _node: &NodeSpec, pid: u32) -> bool {
-        win::terminate(pid)
+        sys::terminate(pid)
     }
 }
 
@@ -95,17 +92,21 @@ pub trait Backend: Send + Sync {
 pub fn plausible_image(kind: NodeKind, image: &str) -> bool {
     let image = image.to_ascii_lowercase();
     match kind {
-        NodeKind::MariaDb => image.contains("mysqld"),
-        NodeKind::Redis => image.contains("redis"),
+        // Unter Linux heisst das Serverprogramm mariadbd - mysqld ist dort
+        // nur noch ein Zweitname und fehlt in manchen Paketen. Wer nur auf
+        // mysqld prueft, erkennt seine eigene Datenbank nach einem Absturz
+        // nicht wieder.
+        NodeKind::MariaDb => image.contains("mysqld") || image.contains("mariadbd"),
+        NodeKind::Redis => image.contains("redis") || image.contains("valkey"),
         _ => image.contains("java"),
     }
 }
 
 pub struct Native {
     java: String,
-    mariadb_bin: PathBuf,
+    mariadb_server: PathBuf,
     mariadb_data: PathBuf,
-    redis_home: PathBuf,
+    redis_server: PathBuf,
     mariadb_port: u16,
     redis_port: u16,
     aikar: bool,
@@ -116,9 +117,9 @@ impl Native {
     pub fn new(paths: &Paths, cfg: &Config) -> Native {
         Native {
             java: std::env::var("TERRANOVA_JAVA").unwrap_or_else(|_| cfg.java.path.clone()),
-            mariadb_bin: crate::deps::mariadb_bin(paths, &cfg.deps.mariadb.version),
+            mariadb_server: crate::deps::mariadb_server(paths, &cfg.deps.mariadb.version),
             mariadb_data: paths.mariadb_home().join("data"),
-            redis_home: paths.redis_home(),
+            redis_server: crate::deps::redis_server(paths),
             mariadb_port: cfg.deps.mariadb.port,
             redis_port: cfg.deps.redis.port,
             aikar: cfg.java.flags == crate::config::JavaFlags::Aikar,
@@ -150,7 +151,7 @@ impl Backend for Native {
     fn spawn(&self, node: &NodeSpec) -> io::Result<Child> {
         let mut cmd = match node.kind {
             NodeKind::MariaDb => {
-                let mut c = Command::new(self.mariadb_bin.join("mysqld.exe"));
+                let mut c = Command::new(&self.mariadb_server);
                 c.arg("--no-defaults")
                     .arg("--console")
                     .arg(format!("--port={}", self.mariadb_port))
@@ -162,7 +163,7 @@ impl Backend for Native {
                 c
             }
             NodeKind::Redis => {
-                let mut c = Command::new(self.redis_home.join("redis-server.exe"));
+                let mut c = Command::new(&self.redis_server);
                 c.arg("--port")
                     .arg(self.redis_port.to_string())
                     .arg("--bind")
@@ -196,9 +197,27 @@ impl Backend for Native {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        #[cfg(windows)]
-        cmd.creation_flags(win::CREATE_NO_WINDOW);
+        sys::hide_window(&mut cmd);
         cmd.spawn()
+    }
+
+    /// Unter Unix gibt es einen echten sanften Ausweg: SIGTERM. Die JVM
+    /// behandelt es ueber ihre Abschalthaken, Paper speichert die Welt und
+    /// beendet sich selbst - auch dann noch, wenn seine Konsole nicht mehr
+    /// annimmt.
+    ///
+    /// Unter Windows bleibt es bei der Vorgabe aus dem Trait: dort kennt eine
+    /// JVM kein Signal, das sie sauber beendet.
+    #[cfg(unix)]
+    fn soft_stop(&self, node: &NodeSpec, timeout: Duration) -> bool {
+        let Some(found) = self.discover(node) else {
+            return true;
+        };
+        if !sys::soft_stop(found.pid) {
+            return false;
+        }
+        let ms = timeout.as_millis().min(u128::from(u32::MAX)) as u32;
+        sys::wait_exit(found.pid, ms)
     }
 }
 
@@ -282,6 +301,14 @@ mod tests {
         assert!(plausible_image(NodeKind::MariaDb, "mysqld.exe"));
         assert!(!plausible_image(NodeKind::MariaDb, "java.exe"));
         assert!(plausible_image(NodeKind::Redis, "redis-server.exe"));
+        // wie es unter Linux heisst
+        assert!(plausible_image(
+            NodeKind::Server,
+            "/usr/lib/jvm/jdk-25/bin/java"
+        ));
+        assert!(plausible_image(NodeKind::MariaDb, "/usr/sbin/mariadbd"));
+        assert!(plausible_image(NodeKind::Redis, "/usr/bin/redis-server"));
+        assert!(plausible_image(NodeKind::Redis, "/usr/bin/valkey-server"));
     }
 
     #[test]

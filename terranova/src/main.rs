@@ -26,7 +26,13 @@ mod secrets;
 mod supervisor;
 mod sync;
 mod web;
-mod win;
+
+// Alles Plattformeigene liegt hinter einer Fassade: Prozesse, Ports, Zeit,
+// Zufall und das Abfangen von Strg+C. Welche Datei dahintersteckt, entscheidet
+// das Zielsystem - der Rest des Programms merkt davon nichts.
+#[cfg_attr(windows, path = "win.rs")]
+#[cfg_attr(unix, path = "unix.rs")]
+mod sys;
 
 #[cfg(test)]
 mod testutil;

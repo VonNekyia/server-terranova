@@ -9,7 +9,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::supervisor::{Status, Supervisor};
-use crate::{reaper, win};
+use crate::{reaper, sys};
 
 const TICK: Duration = Duration::from_secs(30);
 
@@ -41,7 +41,7 @@ pub fn run(sup: Arc<Supervisor>) {
             continue;
         };
         let Ok((h, m)) = plan.time() else { continue };
-        let now = win::local_time();
+        let now = sys::local_time();
         let today = (now.year, now.month, now.day);
         if now.hour != u16::from(h) || now.minute != u16::from(m) || restarted_on == Some(today) {
             continue;

@@ -27,6 +27,33 @@ aus einem zweiten Terminal.
 Voraussetzung ist eine Java-Laufzeit. Getestet mit Java 25 und 26. Mit
 `TERRANOVA_JAVA=<Pfad zu java.exe>` lässt sich eine bestimmte erzwingen.
 
+### Linux
+
+```
+./start.sh
+```
+
+oder gleich `bin/terranova start`. Dieselben Befehle, dieselbe
+`terranova.yml`, derselbe Supervisor — nur darunter arbeitet eine andere
+Prozessverwaltung: statt der Windows-API liest Terranova dort `/proc`, und
+zum Stoppen gibt es mit `SIGTERM` einen Weg, den es unter Windows nicht gibt.
+
+Anders als unter Windows lädt Terranova hier **nichts** herunter. MariaDB und
+Redis kommen aus der Distribution:
+
+```
+sudo apt install mariadb-server redis-server
+```
+
+Fehlt eines von beiden, sagt Terranova beim Start, wie es hereinkommt. Das
+Datenverzeichnis unter `runtime/` gehört trotzdem Terranova; eine
+Systeminstanz auf 3306 bleibt unberührt.
+
+Unter `bin/` liegt nur die Windows-Programmdatei — eine je System einzuchecken
+hieße, sie bei jeder Änderung doppelt zu pflegen. `start.sh` baut die
+Linux-Fassung deshalb beim ersten Mal selbst, sofern Rust installiert ist.
+Fertige Binaries für x86_64 und aarch64 fallen ansonsten in der CI an.
+
 ### Nur das Nötigste
 
 ```
@@ -113,9 +140,13 @@ kann kein halb gelöschter Dungeon entstehen.
 
 ```
 start.bat                   ruft nur bin\terranova.exe start auf
+start.sh                    dasselbe unter Linux
 bin/terranova.exe           das Programm, versioniert
 terranova.yml               was läuft, mit wie viel Speicher, auf welchem Port
 terranova/                  sein Quelltext (Rust)
+  src/win.rs                Prozesse, Ports, Zeit — über die Windows-API
+  src/unix.rs               dasselbe über /proc und Signale
+  src/docker.rs             dasselbe über Container
 proxy/
   velocity.toml             versioniert
   velocity-*.jar            versioniert
@@ -202,6 +233,13 @@ Ein sauberer Stopp hinterlässt im Serverlog `All chunks are saved` und
 RCON läuft je Server auf Port + 100 (main 25666, build 25667, farm 25668,
 Dungeons 25671+), nur auf `127.0.0.1`; das Passwort steht in
 `runtime\rcon.secret`.
+
+Unter Linux kommt vor dem harten Abschuss noch ein Schritt dazu: ein `SIGTERM`.
+Die JVM behandelt es über ihre Abschalthaken, Paper speichert die Welt und
+beendet sich selbst — das klappt auch dann noch, wenn die Konsole schon nicht
+mehr annimmt. Unter Windows gibt es dieses Mittel nicht: eine JVM hat dort kein
+Fenster mit Nachrichtenschleife, `CloseMainWindow` läuft ins Leere, und
+`taskkill` ohne `/F` verweigert den Dienst.
 
 ### Wenn der Supervisor abstürzt
 
@@ -292,8 +330,10 @@ läuft.
 
 ## Docker
 
-`terranova.yml` kennt `runtime: auto | native | docker`. `auto` ist unter
-Windows immer `native` — Docker wird nie gewählt, nur weil es installiert ist.
+`terranova.yml` kennt `runtime: auto | native | docker`. `auto` heißt immer
+`native` — unter Windows wie unter Linux. Docker wird nie gewählt, nur weil es
+installiert ist: wer native Prozesse erwartet, soll nicht plötzlich Container
+bekommen.
 
 Für `runtime: docker` muss in Docker Desktop **host networking** eingeschaltet
 sein (Settings → Resources → Network → Enable host networking → Apply &

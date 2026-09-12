@@ -7,7 +7,9 @@
 use std::ffi::{c_void, OsStr};
 use std::mem;
 use std::os::windows::ffi::OsStrExt as _;
+use std::os::windows::process::CommandExt as _;
 use std::path::Path;
+use std::process::Command;
 use std::ptr;
 use std::sync::OnceLock;
 
@@ -35,6 +37,14 @@ use windows_sys::Win32::System::Threading::{
 pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 pub const DETACHED_PROCESS: u32 = 0x0000_0008;
 pub const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+
+/// Startet ein Hilfsprogramm ohne sichtbares Fenster.
+///
+/// Steht hier, damit die Aufrufstellen kein `creation_flags` und kein
+/// `#[cfg(windows)]` mehr brauchen - unter Unix ist es eine leere Geste.
+pub fn hide_window(cmd: &mut Command) -> &mut Command {
+    cmd.creation_flags(CREATE_NO_WINDOW)
+}
 
 const PROCESS_TERMINATE: u32 = 0x0001;
 const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
@@ -120,6 +130,13 @@ pub fn terminate(pid: u32) -> bool {
         None => false,
     }
 }
+
+// Ein Gegenstueck zu sys::soft_stop gibt es hier bewusst nicht. Eine JVM
+// unter Windows kennt kein Signal, das sie sauber beenden wuerde:
+// CloseMainWindow laeuft ins Leere, weil sie kein Fenster mit
+// Nachrichtenschleife hat, und taskkill ohne /F verweigert den Dienst. Der
+// einzige sanfte Weg ist die Konsole des Servers oder RCON - deshalb bleibt
+// es bei der Vorgabe aus dem Backend-Trait.
 
 /// Startet ein Programm losgeloest: kein Fenster, eigene Prozessgruppe, und
 /// vor allem **ohne geerbte Handles**.

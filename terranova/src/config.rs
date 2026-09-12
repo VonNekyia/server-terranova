@@ -101,7 +101,11 @@ pub struct Deps {
 pub struct MariaDb {
     pub version: String,
     pub port: u16,
+    /// Pruefsumme des Windows-Archivs. Unter Unix wird nichts geladen, also
+    /// auch nichts geprueft - das Feld bleibt trotzdem erlaubt, damit
+    /// dieselbe terranova.yml auf beiden Systemen liest.
     #[serde(default)]
+    #[cfg_attr(unix, allow(dead_code))]
     pub sha256: Option<String>,
     pub image: String,
     pub user: String,
@@ -113,9 +117,14 @@ pub struct MariaDb {
 #[serde(deny_unknown_fields)]
 pub struct Redis {
     pub port: u16,
+    /// Nur fuer Windows: dort gibt es Redis offiziell nicht und Terranova
+    /// laedt einen festgenagelten Fremdbau. Unter Unix kommt Redis aus der
+    /// Paketverwaltung, beide Felder bleiben dann ungelesen.
+    #[cfg_attr(unix, allow(dead_code))]
     pub windows_commit: String,
     /// Dateiname -> erwarteter sha256 der heruntergeladenen Windows-Exes
     #[serde(default)]
+    #[cfg_attr(unix, allow(dead_code))]
     pub sha256: BTreeMap<String, String>,
     pub image: String,
 }
@@ -519,8 +528,12 @@ impl Config {
         match self.runtime {
             RuntimeChoice::Native => Runtime::Native,
             RuntimeChoice::Docker => Runtime::Docker,
-            RuntimeChoice::Auto if cfg!(windows) => Runtime::Native,
-            RuntimeChoice::Auto => Runtime::Docker,
+            // auto heisst nativ, auf beiden Systemen. Docker nur, wenn es
+            // ausdruecklich dasteht: wer native Prozesse erwartet, soll nicht
+            // ploetzlich Container bekommen, bloss weil Docker installiert
+            // ist. Solange es unter Linux keine native Laufzeit gab, stand
+            // hier Docker - jetzt gibt es sie.
+            RuntimeChoice::Auto => Runtime::Native,
         }
     }
 
@@ -711,9 +724,9 @@ mod tests {
     fn auto_ist_unter_windows_native() {
         let c = Config::parse(EXAMPLE).unwrap();
         assert_eq!(c.runtime, RuntimeChoice::Auto);
-        if cfg!(windows) {
-            assert_eq!(c.runtime(), Runtime::Native);
-        }
+        // Auf beiden Systemen nativ - Docker kommt nur, wenn es in der
+        // Config steht.
+        assert_eq!(c.runtime(), Runtime::Native);
     }
 
     #[test]

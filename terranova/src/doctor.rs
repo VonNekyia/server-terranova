@@ -6,7 +6,7 @@ use std::process::{Command, Stdio};
 
 use crate::config::{Config, Runtime};
 use crate::paths::Paths;
-use crate::{paperyml, win};
+use crate::{paperyml, sys};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Level {
@@ -295,8 +295,8 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
     // --- Ports -----------------------------------------------------------------
     let mut busy = Vec::new();
     for (port, what) in ports_of(cfg) {
-        if let Some(pid) = win::port_owner(port) {
-            let who = win::image_name(pid).unwrap_or_else(|| format!("PID {pid}"));
+        if let Some(pid) = sys::port_owner(port) {
+            let who = sys::image_name(pid).unwrap_or_else(|| format!("PID {pid}"));
             busy.push(format!("{port} ({what}) belegt von {who}"));
         }
     }
@@ -402,30 +402,35 @@ fn ports_of(cfg: &Config) -> Vec<(u16, String)> {
 }
 
 fn java_version(java: &str) -> Option<String> {
-    let out = Command::new(java)
-        .arg("-version")
-        .stdin(Stdio::null())
-        .creation_flags(win::CREATE_NO_WINDOW)
-        .output()
-        .ok()?;
+    let mut cmd = Command::new(java);
+    cmd.arg("-version").stdin(Stdio::null());
+    let out = sys::hide_window(&mut cmd).output().ok()?;
     // java -version schreibt nach stderr
     let text = String::from_utf8_lossy(&out.stderr);
     text.lines().next().map(|l| l.trim().to_string())
 }
 
+/// Ob noch eine geplante Windows-Aufgabe fuer den Neustart eingetragen ist.
+/// Den Neustart macht der Supervisor inzwischen selbst; eine uebrig
+/// gebliebene Aufgabe wuerde ein zweites Mal stoppen.
+#[cfg(windows)]
 fn scheduled_task_exists(name: &str) -> bool {
-    Command::new("schtasks")
-        .args(["/Query", "/TN", name])
+    let mut cmd = Command::new("schtasks");
+    cmd.args(["/Query", "/TN", name])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .creation_flags(win::CREATE_NO_WINDOW)
+        .stderr(Stdio::null());
+    sys::hide_window(&mut cmd)
         .status()
         .is_ok_and(|s| s.success())
 }
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt as _;
+/// Unter Unix gibt es diese Aufgabe nicht - dort war der Neustart nie etwas
+/// anderes als der eigene Zeitplan.
+#[cfg(unix)]
+fn scheduled_task_exists(_name: &str) -> bool {
+    false
+}
 
 /// Was aus velocity.toml interessiert.
 #[derive(Debug, Default, PartialEq)]

@@ -111,7 +111,7 @@ pub fn read_info(paths: &Paths) -> Option<SupervisorInfo> {
 
 pub fn write_info(paths: &Paths, port: u16) -> io::Result<()> {
     let pid = std::process::id();
-    let info = json!({ "pid": pid, "created": crate::win::created(pid), "port": port });
+    let info = json!({ "pid": pid, "created": crate::sys::created(pid), "port": port });
     fs::write(paths.supervisor_info(), info.to_string())
 }
 
@@ -119,10 +119,10 @@ pub fn write_info(paths: &Paths, port: u16) -> io::Result<()> {
 /// wiederverwendet.
 pub fn supervisor_running(paths: &Paths) -> Option<SupervisorInfo> {
     let info = read_info(paths)?;
-    let alive = crate::win::alive(info.pid)
+    let alive = crate::sys::alive(info.pid)
         && info
             .created
-            .is_none_or(|c| crate::win::created(info.pid) == Some(c));
+            .is_none_or(|c| crate::sys::created(info.pid) == Some(c));
     alive.then_some(info)
 }
 
@@ -158,5 +158,5 @@ pub fn spawn_detached(paths: &Paths, exe: &Path, only: &[String]) -> io::Result<
     // Eine Auswahl gibt der Supervisor nicht selbst vor - sie steht in der
     // Befehlszeile, mit der er gestartet wurde.
     args.extend(only.iter().map(OsStr::new));
-    crate::win::spawn_detached(exe, &args, &paths.root)
+    crate::sys::spawn_detached(exe, &args, &paths.root)
 }

@@ -5,37 +5,125 @@
 //! ueberhaupt laden koennte. Die Datenbanken muessen also schon stehen,
 //! bevor der erste Server hochfaehrt.
 
+// fs, Path und sha2 braucht nur der Windows-Pfad: das Herunterladen und
+// Auspacken von MariaDB und Redis.
+#[cfg(windows)]
 use std::fs;
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpStream};
-use std::path::{Path, PathBuf};
+#[cfg(windows)]
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 #[cfg(windows)]
-use std::os::windows::process::CommandExt as _;
-
 use sha2::{Digest, Sha256};
 
 use crate::config::Config;
 use crate::paths::Paths;
-use crate::win;
+use crate::sys;
+
+// --- Wo die Programme liegen ---------------------------------------------
+//
+// Unter Windows bringt Terranova MariaDB und Redis selbst mit: es gibt keine
+// Paketverwaltung, auf die man sich verlassen koennte, und ein entpacktes
+// Verzeichnis ist dort der uebliche Weg.
+//
+// Unter Unix genau andersherum. Jede Distribution liefert beide als Paket,
+// und ein zweites, danebengelegtes MariaDB waere vor allem eine Quelle fuer
+// Verwechslungen - zumal die Windows-Archive ohnehin nicht passen. Gesucht
+// wird deshalb, was schon da ist; fehlt es, sagt Terranova das und laedt
+// nichts nach. Pakete einzuspielen ist Sache des Systems, nicht dieses
+// Programms.
 
 /// Wo MariaDB nach dem Entpacken liegt.
+#[cfg(windows)]
 pub fn mariadb_base(paths: &Paths, version: &str) -> PathBuf {
     paths
         .mariadb_home()
         .join(format!("mariadb-{version}-winx64"))
 }
 
+#[cfg(windows)]
 pub fn mariadb_bin(paths: &Paths, version: &str) -> PathBuf {
     mariadb_base(paths, version).join("bin")
+}
+
+/// Das erste dieser Programme, das sich finden laesst.
+///
+/// Neben dem PATH werden die ueblichen Orte fuer Serverprogramme abgesucht:
+/// unter Debian liegt mariadbd in /usr/sbin, und das steht in einer
+/// gewoehnlichen Benutzersitzung nicht im PATH.
+#[cfg(unix)]
+fn which(names: &[&str]) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let extra = ["/usr/sbin", "/usr/local/sbin", "/sbin"];
+    for name in names {
+        let dirs = std::env::split_paths(&path).chain(extra.iter().map(PathBuf::from));
+        for dir in dirs {
+            let p = dir.join(name);
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+    }
+    None
+}
+
+/// Das Serverprogramm von MariaDB.
+#[cfg(windows)]
+pub fn mariadb_server(paths: &Paths, version: &str) -> PathBuf {
+    mariadb_bin(paths, version).join("mysqld.exe")
+}
+
+/// MariaDB heisst seit 10.5 mariadbd; mysqld ist nur noch ein Zweitname und
+/// fehlt in manchen Paketen.
+#[cfg(unix)]
+pub fn mariadb_server(_paths: &Paths, _version: &str) -> PathBuf {
+    which(&["mariadbd", "mysqld"]).unwrap_or_else(|| PathBuf::from("mariadbd"))
+}
+
+/// Der Kommandozeilenclient - fuer das Anlegen der Datenbanken und fuers
+/// Herunterfahren.
+#[cfg(windows)]
+pub fn mariadb_client(paths: &Paths, version: &str) -> PathBuf {
+    mariadb_bin(paths, version).join("mysql.exe")
+}
+
+#[cfg(unix)]
+pub fn mariadb_client(_paths: &Paths, _version: &str) -> PathBuf {
+    which(&["mariadb", "mysql"]).unwrap_or_else(|| PathBuf::from("mariadb"))
+}
+
+/// Das Programm, das ein leeres Datenverzeichnis einrichtet.
+#[cfg(windows)]
+fn mariadb_installer(paths: &Paths, version: &str) -> Option<PathBuf> {
+    let p = mariadb_bin(paths, version).join("mysql_install_db.exe");
+    p.is_file().then_some(p)
+}
+
+#[cfg(unix)]
+fn mariadb_installer(_paths: &Paths, _version: &str) -> Option<PathBuf> {
+    which(&["mariadb-install-db", "mysql_install_db"])
+}
+
+/// Das Serverprogramm von Redis.
+#[cfg(windows)]
+pub fn redis_server(paths: &Paths) -> PathBuf {
+    paths.redis_home().join("redis-server.exe")
+}
+
+#[cfg(unix)]
+pub fn redis_server(_paths: &Paths) -> PathBuf {
+    which(&["redis-server", "valkey-server"]).unwrap_or_else(|| PathBuf::from("redis-server"))
 }
 
 /// curl und tar aus System32 statt vom PATH.
 ///
 /// Auf dieser Maschine liegt Gits GNU-tar im PATH, und das kann keine
 /// Zip-Dateien auspacken. Windows bringt bsdtar mit, das kann es.
+#[cfg(windows)]
 fn system32(tool: &str) -> PathBuf {
     let root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into());
     Path::new(&root).join("System32").join(tool)
@@ -43,11 +131,10 @@ fn system32(tool: &str) -> PathBuf {
 
 fn quiet(cmd: &mut Command) -> &mut Command {
     cmd.stdin(Stdio::null());
-    #[cfg(windows)]
-    cmd.creation_flags(win::CREATE_NO_WINDOW);
-    cmd
+    sys::hide_window(cmd)
 }
 
+#[cfg(windows)]
 fn sha256_of(path: &Path) -> io::Result<String> {
     let mut f = fs::File::open(path)?;
     let mut h = Sha256::new();
@@ -64,6 +151,7 @@ fn sha256_of(path: &Path) -> io::Result<String> {
 
 /// Laedt eine Datei und prueft ihre Pruefsumme. Stimmt sie nicht, bleibt
 /// nichts liegen - lieber kein MariaDB als ein fremdes.
+#[cfg(windows)]
 fn download(url: &str, dest: &Path, expected: Option<&str>) -> io::Result<()> {
     if let Some(dir) = dest.parent() {
         fs::create_dir_all(dir)?;
@@ -91,57 +179,93 @@ fn download(url: &str, dest: &Path, expected: Option<&str>) -> io::Result<()> {
     Ok(())
 }
 
-/// Besorgt MariaDB und richtet das Datenverzeichnis ein.
+/// Stellt sicher, dass MariaDB bereitsteht, und richtet das Datenverzeichnis
+/// ein.
+///
+/// Das Datenverzeichnis gehoert in beiden Faellen uns: Terranova faehrt eine
+/// eigene Instanz auf einem eigenen Port hoch und fasst eine etwaige
+/// Systeminstanz auf 3306 nicht an.
 pub fn ensure_mariadb(paths: &Paths, cfg: &Config, log: &mut dyn FnMut(&str)) -> io::Result<()> {
     let version = &cfg.deps.mariadb.version;
-    let bin = mariadb_bin(paths, version);
-    if !bin.join("mysqld.exe").is_file() {
-        let zip = paths
-            .mariadb_home()
-            .join(format!("mariadb-{version}-winx64.zip"));
-        log(&format!(
-            "MariaDB {version} wird einmalig heruntergeladen (ca. 87 MB)..."
-        ));
-        download(
-            &format!(
-                "https://archive.mariadb.org/mariadb-{version}/winx64-packages/mariadb-{version}-winx64.zip"
-            ),
-            &zip,
-            cfg.deps.mariadb.sha256.as_deref(),
-        )?;
-        log("wird entpackt...");
-        let status = quiet(&mut Command::new(system32("tar.exe")))
-            .arg("-xf")
-            .arg(&zip)
-            .arg("-C")
-            .arg(paths.mariadb_home())
-            .status()?;
-        if !status.success() {
-            return Err(io::Error::other("Entpacken fehlgeschlagen"));
+
+    #[cfg(windows)]
+    {
+        let bin = mariadb_bin(paths, version);
+        if !bin.join("mysqld.exe").is_file() {
+            let zip = paths
+                .mariadb_home()
+                .join(format!("mariadb-{version}-winx64.zip"));
+            log(&format!(
+                "MariaDB {version} wird einmalig heruntergeladen (ca. 87 MB)..."
+            ));
+            download(
+                &format!(
+                    "https://archive.mariadb.org/mariadb-{version}/winx64-packages/mariadb-{version}-winx64.zip"
+                ),
+                &zip,
+                cfg.deps.mariadb.sha256.as_deref(),
+            )?;
+            log("wird entpackt...");
+            let status = quiet(&mut Command::new(system32("tar.exe")))
+                .arg("-xf")
+                .arg(&zip)
+                .arg("-C")
+                .arg(paths.mariadb_home())
+                .status()?;
+            if !status.success() {
+                return Err(io::Error::other("Entpacken fehlgeschlagen"));
+            }
+            let _ = fs::remove_file(&zip);
         }
-        let _ = fs::remove_file(&zip);
+        if !bin.join("mysqld.exe").is_file() {
+            return Err(io::Error::other(format!(
+                "MariaDB nicht gefunden unter {}",
+                bin.display()
+            )));
+        }
     }
-    if !bin.join("mysqld.exe").is_file() {
-        return Err(io::Error::other(format!(
-            "MariaDB nicht gefunden unter {}",
-            bin.display()
-        )));
+
+    // Unter Unix wird nichts nachgeladen: die Windows-Archive passen nicht,
+    // und ein Paket einzuspielen ist Sache des Systems. Fehlt MariaDB, sagt
+    // Terranova nur, wie es hereinkommt.
+    #[cfg(unix)]
+    if which(&["mariadbd", "mysqld"]).is_none() {
+        return Err(io::Error::other(
+            "MariaDB ist nicht installiert.\n  \
+             Debian/Ubuntu:  sudo apt install mariadb-server\n  \
+             Fedora:         sudo dnf install mariadb-server\n  \
+             Arch:           sudo pacman -S mariadb",
+        ));
     }
 
     let data = paths.mariadb_home().join("data");
     if !data.join("mysql").is_dir() {
         log("Datenverzeichnis wird eingerichtet...");
-        let status = quiet(&mut Command::new(bin.join("mysql_install_db.exe")))
-            .arg(format!("--datadir={}", data.display()))
-            .status()?;
+        let Some(installer) = mariadb_installer(paths, version) else {
+            return Err(io::Error::other(
+                "mariadb-install-db nicht gefunden - MariaDB unvollstaendig installiert",
+            ));
+        };
+        let mut cmd = Command::new(installer);
+        cmd.arg(format!("--datadir={}", data.display()));
+        // Debian richtet root auf unix_socket ein. Terranova spricht MariaDB
+        // aber ueber TCP an, und dann greift das nicht. Mit "normal" kommt
+        // root ohne Passwort ueber TCP herein - die Instanz horcht ohnehin
+        // nur auf 127.0.0.1.
+        #[cfg(unix)]
+        cmd.arg("--auth-root-authentication-method=normal");
+        let status = quiet(&mut cmd).status()?;
         if !status.success() {
-            return Err(io::Error::other("mysql_install_db fehlgeschlagen"));
+            return Err(io::Error::other(
+                "Einrichten des Datenverzeichnisses fehlgeschlagen",
+            ));
         }
     }
     Ok(())
 }
 
 /// Besorgt die Redis-Exes vom festgenagelten Commit.
+#[cfg(windows)]
 pub fn ensure_redis(paths: &Paths, cfg: &Config, log: &mut dyn FnMut(&str)) -> io::Result<()> {
     let home = paths.redis_home();
     let commit = &cfg.deps.redis.windows_commit;
@@ -160,6 +284,21 @@ pub fn ensure_redis(paths: &Paths, cfg: &Config, log: &mut dyn FnMut(&str)) -> i
             &dest,
             cfg.deps.redis.sha256.get(file).map(String::as_str),
         )?;
+    }
+    Ok(())
+}
+
+/// Unter Unix gibt es Redis als Paket - und anders als unter Windows sogar
+/// offiziell. Heruntergeladen wird deshalb nichts.
+#[cfg(unix)]
+pub fn ensure_redis(_paths: &Paths, _cfg: &Config, _log: &mut dyn FnMut(&str)) -> io::Result<()> {
+    if which(&["redis-server", "valkey-server"]).is_none() {
+        return Err(io::Error::other(
+            "Redis ist nicht installiert.\n  \
+             Debian/Ubuntu:  sudo apt install redis-server\n  \
+             Fedora:         sudo dnf install redis\n  \
+             Arch:           sudo pacman -S redis",
+        ));
     }
     Ok(())
 }
@@ -251,14 +390,12 @@ pub fn provision(paths: &Paths, cfg: &Config, runtime: crate::config::Runtime) -
         return crate::docker::provision(&d, &sql);
     }
 
-    let out = quiet(&mut Command::new(
-        mariadb_bin(paths, &db.version).join("mysql.exe"),
-    ))
-    .args(["-h", "127.0.0.1", "-P"])
-    .arg(db.port.to_string())
-    .args(["-u", "root", "--protocol=tcp", "-e"])
-    .arg(&sql)
-    .output()?;
+    let out = quiet(&mut Command::new(mariadb_client(paths, &db.version)))
+        .args(["-h", "127.0.0.1", "-P"])
+        .arg(db.port.to_string())
+        .args(["-u", "root", "--protocol=tcp", "-e"])
+        .arg(&sql)
+        .output()?;
     if !out.status.success() {
         return Err(io::Error::other(format!(
             "Datenbanken anlegen fehlgeschlagen: {}",
@@ -274,9 +411,10 @@ pub fn provision(paths: &Paths, cfg: &Config, runtime: crate::config::Runtime) -
 /// Programmdatei. Auf dieser Maschine laeuft daneben ein eigenstaendiger
 /// MariaDB-Dienst auf 3306, den ein pauschales Beenden mit erwischt haette.
 pub fn stop_mariadb(paths: &Paths, cfg: &Config) -> bool {
-    quiet(&mut Command::new(
-        mariadb_bin(paths, &cfg.deps.mariadb.version).join("mysql.exe"),
-    ))
+    quiet(&mut Command::new(mariadb_client(
+        paths,
+        &cfg.deps.mariadb.version,
+    )))
     .args(["-h", "127.0.0.1", "-P"])
     .arg(cfg.deps.mariadb.port.to_string())
     .args(["-u", "root", "--protocol=tcp", "-e", "SHUTDOWN"])
@@ -296,11 +434,32 @@ mod tests {
     use super::*;
     use crate::testutil::EXAMPLE_CONFIG;
 
+    /// Unter Windows bringt Terranova MariaDB selbst mit - dann muss der
+    /// Pfad ins ausgepackte Verzeichnis zeigen.
+    #[cfg(windows)]
     #[test]
     fn pfade() {
         let p = Paths::new("C:\\net");
         assert!(mariadb_bin(&p, "11.4.5").ends_with("mariadb-11.4.5-winx64\\bin"));
         assert!(system32("curl.exe").ends_with("System32\\curl.exe"));
+    }
+
+    /// Unter Unix kommen die Programme aus dem System. Welche genau, haengt
+    /// von der Distribution ab - geprueft wird deshalb nur, dass ein
+    /// plausibler Name herauskommt und nichts im Netzwerkverzeichnis gesucht
+    /// wird. Dort wird unter Unix nichts ausgepackt.
+    #[cfg(unix)]
+    #[test]
+    fn programme_kommen_aus_dem_system() {
+        let p = Paths::new("/opt/terranova");
+        let server = mariadb_server(&p, "11.4.5");
+        let name = server.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(name == "mariadbd" || name == "mysqld", "unerwartet: {name}");
+        assert!(!server.starts_with("/opt/terranova"));
+
+        let client = mariadb_client(&p, "11.4.5");
+        let name = client.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(name == "mariadb" || name == "mysql", "unerwartet: {name}");
     }
 
     #[test]
@@ -316,6 +475,9 @@ mod tests {
         assert!(!redis_ready(1));
     }
 
+    /// Nur Windows laedt etwas herunter, also gibt es auch nur dort etwas zu
+    /// pruefen.
+    #[cfg(windows)]
     #[test]
     fn pruefsumme_stimmt_mit_bekanntem_wert() {
         let dir = crate::testutil::tempdir("sha");

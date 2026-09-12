@@ -16,6 +16,10 @@ serde-saphyr = "1.2"
 sha2 = "0.11"
 lexopt = "0.3"
 
+# Nur fuer Signale, /proc-Zeiten und localtime - kein Framework.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",

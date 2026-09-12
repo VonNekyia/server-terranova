@@ -31,7 +31,7 @@ use crate::backend::{self, Backend, Native};
 use crate::config::{Config, NodeKind, NodeSpec, Runtime};
 use crate::console::{Kind, LineRing};
 use crate::paths::Paths;
-use crate::{deps, mines, rcon, secrets, sync, win};
+use crate::{deps, mines, rcon, secrets, sync, sys};
 
 /// So viele Zeilen Konsole haelt jeder Knoten vor.
 const CONSOLE_LINES: usize = 2000;
@@ -287,7 +287,7 @@ impl Supervisor {
         let msg = msg.as_ref();
         self.events.push(Kind::Sys, msg);
         if let Some(f) = self.log_file.lock().unwrap().as_mut() {
-            let t = win::local_time();
+            let t = sys::local_time();
             let _ = writeln!(
                 f,
                 "[{:02}.{:02}. {:02}:{:02}:{:02}] {msg}",
@@ -342,7 +342,7 @@ impl Supervisor {
         thread::Builder::new()
             .name(format!("tn-wait-{name}"))
             .spawn(move || {
-                win::wait_exit(pid, u32::MAX);
+                sys::wait_exit(pid, u32::MAX);
                 sup.on_exit(&name, None);
             })
             .ok();
@@ -408,7 +408,7 @@ impl Supervisor {
         {
             let mut g = node.lock();
             g.pid = Some(pid);
-            g.created = win::created(pid);
+            g.created = sys::created(pid);
             g.started = Some(Instant::now());
             g.control = Control::Owned;
             g.stdin = Some(tx);

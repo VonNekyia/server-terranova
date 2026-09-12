@@ -15,7 +15,7 @@ pub fn generate() -> String {
     let mut out = String::with_capacity(LEN);
     let mut buf = [0u8; 64];
     while out.len() < LEN {
-        crate::win::random(&mut buf);
+        crate::sys::random(&mut buf);
         for &b in &buf {
             // Verwerfen statt Modulo: erst unterhalb von 4 * 62 = 248 ist jedes
             // Zeichen gleich wahrscheinlich.

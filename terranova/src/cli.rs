@@ -14,7 +14,7 @@ use crate::client::{self, Client};
 use crate::config::Config;
 use crate::paths::Paths;
 use crate::sync::Syncer;
-use crate::{doctor, mines, win, VERSION};
+use crate::{doctor, mines, sys, VERSION};
 
 pub const HELP: &str = "\
 terranova - startet, beaufsichtigt und stoppt das Terranova-Netzwerk
@@ -236,7 +236,7 @@ fn supervise(paths: Paths, cfg: Config, only: Vec<String>) -> ExitCode {
 static VIEWER: OnceLock<(u16, String, crate::config::WindowClose)> = OnceLock::new();
 static CTRL_COUNT: AtomicU32 = AtomicU32::new(0);
 
-fn on_ctrl(ev: win::CtrlEvent) -> bool {
+fn on_ctrl(ev: sys::CtrlEvent) -> bool {
     let Some((port, token, on_close)) = VIEWER.get() else {
         return false;
     };
@@ -251,7 +251,7 @@ fn on_ctrl(ev: win::CtrlEvent) -> bool {
         );
     };
     match ev {
-        win::CtrlEvent::Interrupt | win::CtrlEvent::Break => {
+        sys::CtrlEvent::Interrupt | sys::CtrlEvent::Break => {
             if CTRL_COUNT.fetch_add(1, Ordering::SeqCst) == 0 {
                 println!("\n[terranova] Netzwerk wird heruntergefahren - das dauert, main speichert seine Welt.");
                 println!("[terranova] Noch einmal Strg+C schliesst nur dieses Fenster; das Netzwerk laeuft dann weiter.");
@@ -266,7 +266,7 @@ fn on_ctrl(ev: win::CtrlEvent) -> bool {
         // laeuft, genuegt es, ihm Bescheid zu sagen - er bringt das
         // Herunterfahren allein zu Ende, auch wenn dieses Fenster schon weg
         // ist. Mit on_window_close: detach laeuft das Netzwerk einfach weiter.
-        win::CtrlEvent::Close | win::CtrlEvent::Shutdown => {
+        sys::CtrlEvent::Close | sys::CtrlEvent::Shutdown => {
             if *on_close == crate::config::WindowClose::Stop {
                 stop(Duration::from_secs(2));
             }
@@ -326,7 +326,7 @@ fn view(paths: &Paths, cfg: &Config) -> ExitCode {
         return ExitCode::FAILURE;
     };
     let _ = VIEWER.set((c.port, c.token().to_string(), cfg.dashboard.on_window_close));
-    win::on_console_ctrl(on_ctrl);
+    sys::on_console_ctrl(on_ctrl);
 
     let beim_schliessen = match cfg.dashboard.on_window_close {
         crate::config::WindowClose::Stop => "Fenster schliessen faehrt es ebenfalls herunter",
@@ -460,7 +460,7 @@ fn status(paths: &Paths, cfg: &Config) -> ExitCode {
                     .map(|s| cfg.mine_node(paths, s)),
             )
         {
-            if let Some(pid) = win::port_owner(node.port) {
+            if let Some(pid) = sys::port_owner(node.port) {
                 println!(
                     "  {:<10} laeuft noch (PID {pid}, Port {}) - 'terranova start' uebernimmt ihn",
                     node.name, node.port
@@ -810,8 +810,8 @@ fn sync_cmd(paths: &Paths, cfg: &Config, which: &[String], dry_run: bool) -> Exi
             continue;
         }
         if !dry_run {
-            if let Some(pid) = win::port_owner(node.port) {
-                let who = win::image_name(pid).unwrap_or_else(|| format!("PID {pid}"));
+            if let Some(pid) = sys::port_owner(node.port) {
+                let who = sys::image_name(pid).unwrap_or_else(|| format!("PID {pid}"));
                 eprintln!(
                     "[sync] {}: laeuft ({who} auf Port {}) - uebersprungen, Windows sperrt die Jars",
                     node.name, node.port

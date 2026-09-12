@@ -34,6 +34,22 @@ runtime/
 # entstehen aus den .dist-Dateien daneben - und die gehoeren ins Repository.
 servers/*/server.properties
 servers/*/config/paper-global.yml
+
+# Wer wo Operator ist, wer gesperrt ist: haengt an Spielern und an diesem
+# einen Netzwerk, nicht am Server selbst. Paper legt die Dateien beim Start
+# leer an, wenn sie fehlen. Ein OP wird ueber die Konsole gesetzt, die Rechte
+# verwaltet ohnehin LuckPerms.
+servers/*/ops.json
+servers/*/whitelist.json
+servers/*/banned-players.json
+servers/*/banned-ips.json
+
+# Was Plugins sich zur Laufzeit merken. Alles davon leitet sich aus der Welt
+# oder aus dem ab, was Spieler getan haben - und die Welten sind nicht
+# versioniert, also waere es hier ohnehin nur ein Stand von gestern.
+servers/*/plugins/TAB/playerdata.yml
+servers/*/plugins/Proficisci/storage/
+servers/*/plugins/BountyfulSeas/water_regions.bin
 # Liste dessen, was terranova sync einmal hierher kopiert hat
 servers/*/.terranova-sync.json
 

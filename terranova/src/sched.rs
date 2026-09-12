@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::supervisor::Supervisor;
+use crate::supervisor::{Status, Supervisor};
 use crate::{reaper, win};
 
 const TICK: Duration = Duration::from_secs(30);
@@ -64,6 +64,12 @@ pub fn run(sup: Arc<Supervisor>) {
                 thread::sleep(plan.gap.0);
             }
             let Some(node) = sup.node(name) else { continue };
+            // Was nicht laeuft, wird auch nicht neu gestartet. Wer mit
+            // "terranova start main" bewusst wenig hochgefahren hat, soll um
+            // vier Uhr nicht ploetzlich alles im Speicher haben.
+            if node.status() == Status::Stopped {
+                continue;
+            }
             if !plan.message.is_empty() && !plan.warn.0.is_zero() {
                 let _ = sup.send_command(&node, &format!("say {}", plan.message));
                 thread::sleep(plan.warn.0);

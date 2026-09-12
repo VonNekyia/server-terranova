@@ -148,14 +148,15 @@ pub fn shadow_copy(paths: &Paths) -> io::Result<std::path::PathBuf> {
 /// Er darf nicht an dieser Konsole haengen: beim Schliessen eines Fensters
 /// bleiben einem Prozess etwa fuenf Sekunden, und ein Supervisor, der in
 /// dieser Zeit stirbt, nimmt die Pipes aller Server mit.
-pub fn spawn_detached(paths: &Paths, exe: &Path) -> io::Result<u32> {
-    crate::win::spawn_detached(
-        exe,
-        &[
-            std::ffi::OsStr::new("supervise"),
-            std::ffi::OsStr::new("--root"),
-            paths.root.as_os_str(),
-        ],
-        &paths.root,
-    )
+pub fn spawn_detached(paths: &Paths, exe: &Path, only: &[String]) -> io::Result<u32> {
+    use std::ffi::OsStr;
+    let mut args = vec![
+        OsStr::new("supervise"),
+        OsStr::new("--root"),
+        paths.root.as_os_str(),
+    ];
+    // Eine Auswahl gibt der Supervisor nicht selbst vor - sie steht in der
+    // Befehlszeile, mit der er gestartet wurde.
+    args.extend(only.iter().map(OsStr::new));
+    crate::win::spawn_detached(exe, &args, &paths.root)
 }

@@ -186,6 +186,8 @@ pub struct Supervisor {
     rcon_password: String,
     shutting_down: AtomicBool,
     log_file: Mutex<Option<fs::File>>,
+    /// Wo die oeffentliche Seite ausgeliefert wird, falls sie es wird.
+    site: Mutex<Option<std::net::SocketAddr>>,
 }
 
 impl Supervisor {
@@ -215,6 +217,7 @@ impl Supervisor {
             rcon_password,
             shutting_down: AtomicBool::new(false),
             log_file: Mutex::new(log_file),
+            site: Mutex::new(None),
             paths,
             cfg,
         });
@@ -601,7 +604,12 @@ impl Supervisor {
 
     // --- Netzwerk ----------------------------------------------------------------
 
-    pub fn start_network(self: &Arc<Self>) -> io::Result<()> {
+    /// Faehrt das Netzwerk hoch. `only` leer heisst: alles.
+    ///
+    /// Mit Namen darin bleibt es beim Noetigsten - Datenbanken, Proxy und
+    /// die genannten Server. Dungeons kommen dann nicht von selbst zurueck:
+    /// wer bewusst wenig startet, will nicht acht Welten im Speicher.
+    pub fn start_network(self: &Arc<Self>, only: &[String]) -> io::Result<()> {
         self.shutting_down.store(false, Ordering::SeqCst);
 
         // Datenbanken zuerst: die Plugins lesen ihre Configs, bevor sie
@@ -616,11 +624,16 @@ impl Supervisor {
         let mut to_start: Vec<Arc<Node>> = self
             .all()
             .into_iter()
-            .filter(|n| matches!(n.spec.kind, NodeKind::Proxy | NodeKind::Server))
+            .filter(|n| match n.spec.kind {
+                // Der Proxy immer: ohne ihn kommt niemand auf 25565 an.
+                NodeKind::Proxy => true,
+                NodeKind::Server => only.is_empty() || only.contains(&n.spec.name),
+                _ => false,
+            })
             .collect();
 
         // Offene Dungeons wieder hochfahren, solange sie nicht abgelaufen sind.
-        if self.cfg.mines.resume {
+        if self.cfg.mines.resume && only.is_empty() {
             for slot in mines::existing(&self.paths.servers(), self.cfg.mines.slots) {
                 let dir = self.paths.server(&mines::name(slot));
                 let age_ok = matches!(
@@ -658,6 +671,54 @@ impl Supervisor {
             thread::sleep(Duration::from_secs(2));
         }
         Ok(())
+    }
+
+    /// Liefert die oeffentliche Seite aus.
+    ///
+    /// Haengt bewusst nicht am Netzwerk: gerade wenn die Server unten sind,
+    /// soll die Seite noch stehen - dort steht dann, warum.
+    pub fn start_site(&self) {
+        let site = &self.cfg.web.site;
+        let root = self.paths.root.join(&site.dir);
+        match crate::web::serve_site(root.clone(), &site.bind, site.port) {
+            Ok(Some(addr)) => {
+                *self.site.lock().unwrap() = Some(addr);
+                self.log(format!(
+                    "Webseite auf http://{addr}/ aus {}",
+                    root.display()
+                ));
+            }
+            Ok(None) if site.port != 0 => {
+                self.log(format!("Webseite: {} hat keine index.html", root.display()));
+            }
+            Ok(None) => {}
+            Err(e) => self.log(format!("Webseite auf Port {}: {e}", site.port)),
+        }
+    }
+
+    pub fn site_addr(&self) -> Option<std::net::SocketAddr> {
+        *self.site.lock().unwrap()
+    }
+
+    /// Was die Karte macht.
+    ///
+    /// Pl3xMap laeuft im Server-Prozess, nicht als eigener Dienst. Deshalb
+    /// ist "die Karte ist unten, weil main unten ist" etwas anderes als
+    /// "main laeuft, aber auf dem Kartenport antwortet niemand" - das zweite
+    /// ist ein Fehler, das erste nicht.
+    pub fn map_state(&self) -> &'static str {
+        let m = &self.cfg.web.map;
+        if m.port == 0 {
+            return "off";
+        }
+        if self.node(&m.server).map(|n| n.status()) != Some(Status::Ready) {
+            return "waiting";
+        }
+        if crate::web::reachable(m.port) {
+            "ready"
+        } else {
+            "down"
+        }
     }
 
     pub fn start_deps(self: &Arc<Self>) -> io::Result<()> {

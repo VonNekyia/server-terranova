@@ -210,6 +210,88 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
         }
     }
 
+    // --- Web ---------------------------------------------------------------
+    let site = &cfg.web.site;
+    let root = paths.root.join(&site.dir);
+    if site.port == 0 {
+        add(
+            Level::Ok,
+            "Website",
+            "abgeschaltet (web.site.port: 0)".into(),
+        );
+    } else if !root.join("index.html").is_file() {
+        add(
+            Level::Warn,
+            "Website",
+            format!(
+                "{} hat keine index.html - es wird nichts ausgeliefert",
+                root.display()
+            ),
+        );
+    } else {
+        add(
+            Level::Ok,
+            "Website",
+            format!("{} auf {}:{}", root.display(), site.bind, site.port),
+        );
+        if site.bind != "127.0.0.1" && site.bind != "localhost" {
+            add(
+                Level::Warn,
+                "Website",
+                format!(
+                    "gebunden an {} - die Seite ist aus dem Netz erreichbar. Davor gehoert                      etwas, das TLS spricht und Last abfaengt; dieser Server kann beides nicht.",
+                    site.bind
+                ),
+            );
+        }
+    }
+
+    // Die Karte gehoert Pl3xMap. Wir koennen nur pruefen, ob das, was in
+    // terranova.yml steht, zu dem passt, was das Plugin tatsaechlich tut -
+    // sonst zeigt das Dashboard eine Karte als tot an, die laeuft.
+    let map = &cfg.web.map;
+    if map.port == 0 {
+        add(Level::Ok, "Karte", "abgeschaltet (web.map.port: 0)".into());
+    } else if !cfg.servers.contains_key(&map.server) {
+        add(
+            Level::Fail,
+            "Karte",
+            format!(
+                "web.map.server: {} - diesen Server gibt es nicht",
+                map.server
+            ),
+        );
+    } else {
+        match crate::web::pl3xmap_webserver(&paths.server(&map.server)) {
+            None => add(
+                Level::Warn,
+                "Karte",
+                format!(
+                    "{}: plugins/Pl3xMap/config.yml nicht lesbar - laeuft das Plugin dort?",
+                    map.server
+                ),
+            ),
+            Some((false, _)) => add(
+                Level::Warn,
+                "Karte",
+                format!("{}: Pl3xMaps interner Webserver ist aus", map.server),
+            ),
+            Some((true, p)) if p != map.port => add(
+                Level::Fail,
+                "Karte",
+                format!(
+                    "web.map.port: {}, aber Pl3xMap horcht auf {p} ({}/plugins/Pl3xMap/config.yml)",
+                    map.port, map.server
+                ),
+            ),
+            Some((true, p)) => add(
+                Level::Ok,
+                "Karte",
+                format!("Pl3xMap in {} auf Port {p}", map.server),
+            ),
+        }
+    }
+
     // --- Ports -----------------------------------------------------------------
     let mut busy = Vec::new();
     for (port, what) in ports_of(cfg) {
@@ -310,6 +392,9 @@ fn ports_of(cfg: &Config) -> Vec<(u16, String)> {
         (cfg.deps.redis.port, "redis".into()),
         (cfg.dashboard.port, "dashboard".into()),
     ];
+    if cfg.web.site.port != 0 {
+        v.push((cfg.web.site.port, "website".into()));
+    }
     for (name, s) in &cfg.servers {
         v.push((s.port, name.clone()));
     }

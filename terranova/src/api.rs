@@ -166,9 +166,19 @@ impl Api {
             (true, ["api", "nodes", name, action]) => self.node_action(name, action, &req),
 
             (true, ["api", "network", "start"]) => {
+                // {"servers": ["main"]} startet nur diese - leer heisst alles.
+                let only: Vec<String> = serde_json::from_slice::<serde_json::Value>(&req.body)
+                    .ok()
+                    .and_then(|v| v["servers"].as_array().cloned())
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|s| s.as_str().map(str::to_string))
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 let sup = self.sup.clone();
                 thread::spawn(move || {
-                    if let Err(e) = sup.start_network() {
+                    if let Err(e) = sup.start_network(&only) {
                         sup.log(format!("Start fehlgeschlagen: {e}"));
                     }
                 });
@@ -223,10 +233,29 @@ impl Api {
                 })
             })
             .collect();
+        let m = &self.sup.cfg.web.map;
         ok_json(json!({
             "runtime": self.sup.cfg.runtime().to_string(),
             "shutting_down": self.sup.shutting_down(),
             "nodes": nodes,
+            "web": {
+                "site": self.sup.site_addr().map(|a| json!({
+                    "port": a.port(),
+                    // Gebunden an 0.0.0.0 heisst: aus dem Netz erreichbar.
+                    // Anzeigen laesst sie sich trotzdem nur ueber 127.0.0.1.
+                    "public": !a.ip().is_loopback(),
+                    "url": format!("http://127.0.0.1:{}/", a.port()),
+                })),
+                "map": {
+                    "status": self.sup.map_state(),
+                    "server_status": self.sup.node(&m.server).map(|n| n.status()),
+                    "port": m.port,
+                    "server": m.server,
+                    "url": m.url,
+                    "local": format!("http://127.0.0.1:{}/", m.port),
+                    "worlds": crate::web::mapped_worlds(&self.sup.paths.server(&m.server)),
+                },
+            },
         }))
     }
 

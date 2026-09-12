@@ -93,3 +93,26 @@ dashboard:
   # stop = Schliessen des Startfensters faehrt das Netzwerk sauber herunter
   # detach = das Netzwerk laeuft ohne Fenster weiter
   on_window_close: stop
+
+web:
+  # Die oeffentliche Seite. Ein fertiger Build ohne eigenen Server -
+  # Terranova liefert ihn selbst aus, damit daneben kein zweiter Webserver
+  # gepflegt werden muss.
+  site:
+    dir: website
+    # 0 schaltet die Auslieferung ab
+    port: 8081
+    # 127.0.0.1 = nur dieser Rechner. Fuer den oeffentlichen Betrieb hier
+    # 0.0.0.0 eintragen - und daran denken, dass dann auch die Firewall und
+    # die Portfreigabe im Router mitspielen muessen.
+    bind: 127.0.0.1
+  # Die Weltkarte laeuft nicht als eigener Dienst, sondern im Pl3xMap-Plugin
+  # von main. Terranova startet sie also nicht, sondern sieht nur nach, ob
+  # sie antwortet.
+  map:
+    # muss zu internal-webserver.port in
+    # servers/main/plugins/Pl3xMap/config.yml passen
+    port: 8080
+    server: main
+    # nur zum Anzeigen
+    url: "https://map.mcterranova.de"

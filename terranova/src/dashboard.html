@@ -40,7 +40,10 @@
   }
   .ready { color: var(--ok); } .stopped { color: var(--dim); }
   .starting, .stopping { color: var(--warn); }
-  .crashloop, .conflict { color: var(--bad); }
+  .crashloop, .conflict, .down { color: var(--bad); }
+  .waiting { color: var(--dim); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
   .adopted { color: var(--warn); font-size: 12px; }
   button {
     background: #262c36; color: var(--fg); border: 1px solid var(--line);
@@ -92,6 +95,11 @@
       </tr></thead>
       <tbody id="nodes"></tbody>
     </table>
+  </section>
+
+  <section>
+    <h2>Web</h2>
+    <table><tbody id="web"></tbody></table>
   </section>
 
   <section>
@@ -231,6 +239,51 @@ async function send() {
   } catch (e) { toast(e.message); }
 }
 
+// Website und Weltkarte. Die eine liefert Terranova selbst aus, die andere
+// steckt im Server-Prozess von main - deshalb steht hier keine Schaltflaeche
+// zum Starten, sondern nur, ob jemand antwortet.
+const webRows = new Map();
+
+function fillWeb(w) {
+  const want = [];
+  if (w && w.site) want.push({
+    key: "site", name: "Website", status: "ready", port: w.site.port,
+    href: w.site.url,
+    note: w.site.public ? "aus dem Netz erreichbar" : "nur dieser Rechner",
+  });
+  if (w && w.map && w.map.status !== "off") want.push({
+    key: "map", name: "Weltkarte", status: w.map.status, port: w.map.port,
+    href: w.map.url || w.map.local,
+    note: w.map.status === "waiting" ? `wartet auf ${w.map.server} (${w.map.server_status || "stopped"})`
+        : w.map.status === "down" ? `${w.map.server} läuft, aber der Kartenport antwortet nicht`
+        : w.map.worlds ? `${w.map.worlds} Welten`
+        : "noch keine Kacheln gerendert",
+  });
+
+  const body = $("#web");
+  for (const it of want) {
+    let r = webRows.get(it.key);
+    if (!r) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="name"></td><td></td><td class="num"></td>
+                      <td><a target="_blank" rel="noopener"></a></td><td class="dim"></td>`;
+      const c = tr.querySelectorAll("td");
+      r = { tr, name: c[0], state: c[1], port: c[2], link: c[3].firstElementChild, note: c[4] };
+      webRows.set(it.key, r);
+      body.append(tr);
+    }
+    r.name.textContent = it.name;
+    r.state.innerHTML = `<span class="badge ${it.status}">${it.status}</span>`;
+    r.port.textContent = it.port;
+    r.link.textContent = it.href.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    r.link.href = it.href;
+    r.note.textContent = it.note;
+  }
+  if (!want.length && !body.childNodes.length) {
+    body.innerHTML = `<tr><td class="dim">Nichts eingerichtet.</td></tr>`;
+  }
+}
+
 async function refresh() {
   try {
     const s = await api("/api/status");
@@ -250,6 +303,8 @@ async function refresh() {
     for (const [name, r] of rows) {
       if (!seen.has(name)) { r.tr.remove(); rows.delete(name); }
     }
+
+    fillWeb(s.web);
 
     const m = await api("/api/mines");
     $("#slots").textContent = `${m.mines.length} von ${m.slots} Plätzen belegt`;

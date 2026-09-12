@@ -25,6 +25,7 @@ mod sched;
 mod secrets;
 mod supervisor;
 mod sync;
+mod web;
 mod win;
 
 #[cfg(test)]

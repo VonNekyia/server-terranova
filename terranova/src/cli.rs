@@ -23,6 +23,7 @@ terranova - startet, beaufsichtigt und stoppt das Terranova-Netzwerk
 
 Netzwerk
   start [--detach]      Datenbanken, Proxy und Server hochfahren
+  start <name...>       nur diese Server - fuer schwaechere Rechner
   stop [name...]        alles oder einzelne Knoten sauber herunterfahren
   restart <name>        stoppen, bestuecken, wieder starten
   status                was laeuft
@@ -129,8 +130,8 @@ pub fn run() -> ExitCode {
     };
 
     match command.as_str() {
-        "supervise" => supervise(paths, cfg),
-        "start" => start(&paths, &cfg, args.detach),
+        "supervise" => supervise(paths, cfg, args.values),
+        "start" => start(&paths, &cfg, args.detach, &args.values),
         "stop" => stop(&paths, &cfg, &args.values),
         "restart" => restart(&paths, &cfg, &args.values),
         "status" => status(&paths, &cfg),
@@ -159,7 +160,7 @@ pub fn run() -> ExitCode {
 
 /// Wird nicht von Hand aufgerufen: `terranova start` startet das hier
 /// losgeloest im Hintergrund.
-fn supervise(paths: Paths, cfg: Config) -> ExitCode {
+fn supervise(paths: Paths, cfg: Config, only: Vec<String>) -> ExitCode {
     use std::fs::OpenOptions;
     #[cfg(windows)]
     use std::os::windows::fs::OpenOptionsExt as _;
@@ -204,11 +205,16 @@ fn supervise(paths: Paths, cfg: Config) -> ExitCode {
         "Terranova {VERSION} - Schnittstelle auf 127.0.0.1:{port}"
     ));
 
+    sup.start_site();
+
     // Was schon laeuft, uebernehmen - etwa nach einem Absturz des
     // Supervisors, waehrend die Server weiterliefen.
     sup.adopt_running();
 
-    if let Err(e) = sup.start_network() {
+    if !only.is_empty() {
+        sup.log(format!("Nur: {}", only.join(", ")));
+    }
+    if let Err(e) = sup.start_network(&only) {
         sup.log(format!("Start fehlgeschlagen: {e}"));
     }
 
@@ -269,7 +275,7 @@ fn on_ctrl(ev: win::CtrlEvent) -> bool {
     }
 }
 
-fn start(paths: &Paths, cfg: &Config, detach: bool) -> ExitCode {
+fn start(paths: &Paths, cfg: &Config, detach: bool, only: &[String]) -> ExitCode {
     let c = match Client::new(paths, cfg) {
         Ok(c) => c,
         Err(e) => {
@@ -288,7 +294,7 @@ fn start(paths: &Paths, cfg: &Config, detach: bool) -> ExitCode {
                 return ExitCode::FAILURE;
             }
         };
-        match client::spawn_detached(paths, &exe) {
+        match client::spawn_detached(paths, &exe, only) {
             Ok(pid) => println!("[terranova] Supervisor gestartet (PID {pid})"),
             Err(e) => {
                 eprintln!("terranova: Supervisor laesst sich nicht starten: {e}");
@@ -488,9 +494,62 @@ fn status(paths: &Paths, cfg: &Config) -> ExitCode {
                     },
                 );
             }
+            print_web(&v["web"]);
             ExitCode::SUCCESS
         }
         other => report(other, ""),
+    }
+}
+
+/// Die beiden Dinge, die im Browser landen. Die Seite liefert Terranova
+/// selbst aus, die Karte steckt im Server-Prozess - deshalb steht bei ihr
+/// kein PID, sondern nur, ob sie antwortet.
+fn print_web(web: &serde_json::Value) {
+    let site = &web["site"];
+    let map = &web["map"];
+    if site.is_null() && map["status"] == "off" {
+        return;
+    }
+    println!("Web:");
+    if let Some(port) = site["port"].as_u64() {
+        println!(
+            "  {:<10} {:<10} Port {:<6} {}{}",
+            "website",
+            "ready",
+            port,
+            site["url"].as_str().unwrap_or(""),
+            if site["public"] == true {
+                "   (aus dem Netz erreichbar)"
+            } else {
+                "   (nur dieser Rechner)"
+            },
+        );
+    }
+    if map["status"] != "off" {
+        let worlds = map["worlds"].as_u64().unwrap_or(0);
+        println!(
+            "  {:<10} {:<10} Port {:<6} {}   {}",
+            "karte",
+            map["status"].as_str().unwrap_or("?"),
+            map["port"].as_u64().unwrap_or(0),
+            if map["url"].as_str().unwrap_or("").is_empty() {
+                map["local"].as_str().unwrap_or("")
+            } else {
+                map["url"].as_str().unwrap_or("")
+            },
+            {
+                let host = map["server"].as_str().unwrap_or("?");
+                match map["status"].as_str().unwrap_or("") {
+                    "waiting" => format!(
+                        "wartet auf {host} ({})",
+                        map["server_status"].as_str().unwrap_or("stopped")
+                    ),
+                    "down" => format!("{host} laeuft, aber der Kartenport antwortet nicht"),
+                    _ if worlds == 0 => "noch keine Kacheln gerendert".to_string(),
+                    _ => format!("{worlds} Welten"),
+                }
+            },
+        );
     }
 }
 

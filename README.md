@@ -27,6 +27,27 @@ aus einem zweiten Terminal.
 Voraussetzung ist eine Java-Laufzeit. Getestet mit Java 25 und 26. Mit
 `TERRANOVA_JAVA=<Pfad zu java.exe>` lässt sich eine bestimmte erzwingen.
 
+### Nur das Nötigste
+
+```
+start_minimal.bat
+```
+
+Datenbanken, Proxy und `main` — sonst nichts. `build`, `farm` und die Dungeons
+bleiben aus; zusammen belegen die rund acht Gigabyte, und auf einem knappen
+Rechner ist das der Unterschied zwischen spielbar und nicht. Dahinter steckt
+kein zweiter Startweg, nur `terranova start main`: jeder Servername hinter
+`start` grenzt ein, was hochfährt.
+
+Nachziehen geht jederzeit und ohne Neustart des Netzwerks:
+
+```
+terranova restart build
+```
+
+Der tägliche Neustart um vier rührt nur an, was auch läuft — aus einem
+schmalen Start wird über Nacht also kein vollständiger.
+
 ## Die Server
 
 | Server | Port | Speicher | Was drauf liegt |
@@ -44,6 +65,7 @@ wer direkt auf 25566 will, müsste schon auf der Maschine sein.
 
 ```
 terranova start [--detach]     hochfahren (ohne --detach: zusehen)
+terranova start <name...>      nur diese Server hochfahren
 terranova stop [name...]       alles oder einzelne Knoten herunterfahren
 terranova restart <name>       stoppen, bestücken, starten
 terranova status               was läuft
@@ -224,6 +246,49 @@ bekommt beim Abruf der Seite ein Sitzungsplätzchen (`HttpOnly`,
 Seite bekommt, sitzt an diesem Rechner: der `Host`-Kopf muss `127.0.0.1` oder
 `localhost` sein, eine fremde Webseite kann die Antwort nicht lesen, und ihre
 eigenen Anfragen tragen das Plätzchen wegen `SameSite=Strict` nicht mit.
+
+## Website und Karte
+
+```
+terranova status
+```
+
+zeigt unter **Web** beides:
+
+| | |
+| --- | --- |
+| `website` | die öffentliche Seite aus `website/`, ausgeliefert auf **8081** |
+| `karte` | Pl3xMap in `main` auf **8080** |
+
+Die Seite in `website/` ist ein fertiger Build ohne eigenen Server. Terranova
+liefert sie deshalb selbst aus — daneben noch nginx zu pflegen wäre ein
+zweites Ding, das jemand starten, aktuell halten und überwachen müsste. Pfade
+wie `/impressum` gibt es nur im Browser: was keine Dateiendung hat und nicht
+existiert, bekommt `index.html` (eine fehlende `.png` bleibt 404). Alles unter
+`static/` trägt seinen Inhalt im Namen und wird als unveränderlich
+ausgeliefert, der Rest über ETag — ohne das ginge das acht Megabyte große
+Hintergrundbild bei jedem Seitenwechsel neu über die Leitung.
+
+Voreingestellt ist `bind: 127.0.0.1`, also **nur dieser Rechner**. Für den
+öffentlichen Betrieb steht in `terranova.yml` unter `web.site.bind` ein
+`0.0.0.0` — davor gehört dann etwas, das TLS spricht und Last abfängt; dieser
+Server kann beides nicht, und `terranova doctor` sagt das auch.
+
+Die Karte gehört uns nicht: Pl3xMap bringt seinen eigenen Webserver mit und
+läuft **im Prozess von `main`**. Terranova kann sie also nicht starten oder
+stoppen, nur nachsehen — und dafür drei Zustände unterscheiden, die sonst
+alle gleich aussehen:
+
+| Zustand | Heißt |
+| --- | --- |
+| `ready` | antwortet, mit der Zahl der gerenderten Welten |
+| `waiting` | `main` läuft (noch) nicht — kein Fehler |
+| `down` | `main` läuft, aber auf 8080 antwortet niemand |
+
+`terranova doctor` vergleicht außerdem `web.map.port` mit dem, was in
+`servers/main/plugins/Pl3xMap/config.yml` unter `internal-webserver` steht.
+Gehen die auseinander, zeigt das Dashboard sonst eine Karte als tot an, die
+läuft.
 
 ## Docker
 

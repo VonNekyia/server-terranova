@@ -28,6 +28,8 @@ pub struct Config {
     pub schedule: Schedule,
     #[serde(default)]
     pub dashboard: Dashboard,
+    #[serde(default)]
+    pub web: Web,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
@@ -213,6 +215,88 @@ impl Default for Dashboard {
             on_window_close: WindowClose::default(),
         }
     }
+}
+
+/// Was im Browser liegt: die oeffentliche Seite und die Weltkarte.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Web {
+    #[serde(default)]
+    pub site: Site,
+    #[serde(default)]
+    pub map: Map,
+}
+
+/// Die oeffentliche Seite. Terranova liefert sie selbst aus - ein eigener
+/// Webserver daneben waere ein zweites Ding, das jemand starten, aktuell
+/// halten und ueberwachen muesste.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Site {
+    /// Verzeichnis mit dem fertigen Build, relativ zum Netzwerkverzeichnis.
+    #[serde(default = "default_site_dir")]
+    pub dir: String,
+    /// 0 schaltet die Auslieferung ab.
+    #[serde(default = "default_site_port")]
+    pub port: u16,
+    /// 127.0.0.1 = nur dieser Rechner. Fuer den oeffentlichen Betrieb
+    /// 0.0.0.0 - das ist eine Entscheidung, die bewusst hier steht und
+    /// nicht als Vorgabe.
+    #[serde(default = "default_bind")]
+    pub bind: String,
+}
+
+impl Default for Site {
+    fn default() -> Site {
+        Site {
+            dir: default_site_dir(),
+            port: default_site_port(),
+            bind: default_bind(),
+        }
+    }
+}
+
+/// Die Weltkarte. Sie laeuft nicht als eigener Prozess, sondern im
+/// Pl3xMap-Plugin von main - hier steht nur, wo nachzusehen ist.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Map {
+    /// internal-webserver.port aus plugins/Pl3xMap/config.yml. 0 = keine
+    /// Karte, dann wird auch nicht nachgesehen.
+    #[serde(default = "default_map_port")]
+    pub port: u16,
+    /// In welchem Server das Plugin steckt.
+    #[serde(default = "default_map_server")]
+    pub server: String,
+    /// Die oeffentliche Adresse, falls es eine gibt - nur zum Anzeigen.
+    #[serde(default)]
+    pub url: String,
+}
+
+impl Default for Map {
+    fn default() -> Map {
+        Map {
+            port: default_map_port(),
+            server: default_map_server(),
+            url: String::new(),
+        }
+    }
+}
+
+fn default_site_dir() -> String {
+    "website".into()
+}
+fn default_site_port() -> u16 {
+    8081
+}
+fn default_bind() -> String {
+    "127.0.0.1".into()
+}
+fn default_map_port() -> u16 {
+    8080
+}
+fn default_map_server() -> String {
+    "main".into()
 }
 
 /// Was passiert, wenn das Startfenster geschlossen wird.

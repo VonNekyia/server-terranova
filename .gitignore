@@ -77,6 +77,8 @@ servers/*/world_nether/
 servers/*/world_the_end/
 templates/*/world/
 **/usercache.json
+# Sperrdatei einer geoeffneten Welt - schreibt Minecraft beim Laden neu
+**/session.lock
 **/.console_history
 **/.paper/
 *.log

@@ -38,6 +38,15 @@
     display: inline-block; padding: 1px 8px; border-radius: 99px;
     font-size: 12px; border: 1px solid currentColor;
   }
+  /* Was ein Knoten ist: paper, proxy, database, valuedb, dungeon. Ob er
+     statisch oder dynamisch ist, sagt schon der Abschnitt, in dem er steht -
+     das steht deshalb nicht noch einmal als Schlagwort daneben. */
+  .tag {
+    display: inline-block; padding: 0 6px; border-radius: 4px;
+    font-size: 11px; color: var(--dim); border: 1px solid var(--line);
+  }
+  .tag + .tag { margin-left: 4px; }
+  .tag.dungeon { color: var(--accent); border-color: var(--accent); }
   .ready { color: var(--ok); } .stopped { color: var(--dim); }
   .starting, .stopping { color: var(--warn); }
   .crashloop, .conflict, .down { color: var(--bad); }
@@ -87,10 +96,10 @@
 
 <main>
   <section>
-    <h2>Server</h2>
+    <h2>Statische Server</h2>
     <table>
       <thead><tr>
-        <th>Name</th><th>Zustand</th><th class="num">Port</th><th class="num">PID</th>
+        <th>Name</th><th>Art</th><th>Zustand</th><th class="num">Port</th><th class="num">PID</th>
         <th class="num">Laufzeit</th><th></th>
       </tr></thead>
       <tbody id="nodes"></tbody>
@@ -112,7 +121,9 @@
   </section>
 
   <section>
-    <h2>Dungeons</h2>
+    <h2>Dynamische Server</h2>
+    <p class="dim">Dungeons — werden auf Zuruf geöffnet und laufen nach ihrer
+      Zeit von selbst aus.</p>
     <table><tbody id="mines"></tbody></table>
     <div class="bar">
       <button id="open">Öffnen</button>
@@ -176,7 +187,7 @@ function button(label, fn, danger) {
 
 function nodeRow(n) {
   const tr = document.createElement("tr");
-  tr.innerHTML = `<td class="name"></td><td></td><td class="num"></td>
+  tr.innerHTML = `<td class="name"></td><td class="tags"></td><td></td><td class="num"></td>
                   <td class="num"></td><td class="num"></td>`;
   const td = document.createElement("td");
   td.className = "actions";
@@ -186,11 +197,25 @@ function nodeRow(n) {
   td.append(konsole, toggle, neu);
   tr.append(td);
   const cells = tr.querySelectorAll("td");
-  return { tr, toggle, name: cells[0], state: cells[1], port: cells[2], pid: cells[3], up: cells[4] };
+  return {
+    tr, toggle,
+    name: cells[0], tags: cells[1], state: cells[2],
+    port: cells[3], pid: cells[4], up: cells[5],
+  };
+}
+
+// Alles ausser der Einordnung statisch/dynamisch - die sagt schon der
+// Abschnitt, in dem die Zeile steht.
+function tagHtml(tags) {
+  return (tags || [])
+    .filter(t => t !== "static" && t !== "dynamic")
+    .map(t => `<span class="tag ${t}">${t}</span>`)
+    .join("");
 }
 
 function fillNode(r, n) {
   r.name.textContent = n.name;
+  r.tags.innerHTML = tagHtml(n.tags);
   r.state.innerHTML = `<span class="badge ${n.status}">${n.status}</span>` +
     (n.control === "adopted"
       ? ' <span class="adopted" title="lief schon – Befehle gehen über RCON">übernommen</span>'
@@ -295,6 +320,9 @@ async function refresh() {
     const body = $("#nodes");
     const seen = new Set();
     for (const n of s.nodes) {
+      // Dungeons stehen unten unter "Dynamische Server", mit ihrer Restzeit
+      // und dem Schliessen-Knopf. Sonst staende jeder offene zweimal da.
+      if (n.tags?.includes("dynamic")) continue;
       seen.add(n.name);
       let r = rows.get(n.name);
       if (!r) { r = nodeRow(n); rows.set(n.name, r); body.append(r.tr); }
@@ -319,12 +347,18 @@ async function refresh() {
       for (const mine of m.mines) {
         const tr = document.createElement("tr");
         tr.innerHTML = `<td class="name">${mine.name}</td>
+          <td class="tags">${tagHtml(["paper", "dungeon"])}</td>
           <td><span class="badge ${mine.status}">${mine.status}</span></td>
           <td class="num">Port ${mine.port}</td>
           <td class="num">noch ${secs(mine.expires_in_s)}</td>`;
         const td = document.createElement("td");
         td.className = "actions";
         const slot = mine.name.split("-")[1];
+        // Die Konsole gab es bisher nur ueber die Serverliste - stuende ein
+        // Dungeon dort nicht mehr, waere sie damit weg.
+        if (mine.status !== "stopped") {
+          td.append(button("Konsole", async () => watch(mine.name)));
+        }
         td.append(button("Schließen", () => api(`/api/mines/${slot}/close`, "POST"), true));
         tr.append(td); mb.append(tr);
       }

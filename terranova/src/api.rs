@@ -57,6 +57,23 @@ fn kind_str(k: NodeKind) -> &'static str {
     }
 }
 
+/// Die Schlagworte eines Knotens - woraus das Dashboard seine Gliederung
+/// baut.
+///
+/// Das erste sagt, was der Knoten *ist*: eine Datenbank, ein Schluessel-Wert-
+/// Speicher, der Proxy oder ein Paper-Server. Das letzte sagt, ob er zum
+/// festen Bestand gehoert oder zur Laufzeit kommt und geht. Ein Dungeon ist
+/// beides: ein Paper-Server, und zwar ein dynamischer.
+fn tags(k: NodeKind) -> &'static [&'static str] {
+    match k {
+        NodeKind::MariaDb => &["database", "static"],
+        NodeKind::Redis => &["valuedb", "static"],
+        NodeKind::Proxy => &["proxy", "static"],
+        NodeKind::Server => &["paper", "static"],
+        NodeKind::Mine(_) => &["paper", "dungeon", "dynamic"],
+    }
+}
+
 fn bad(status: u16, msg: &str) -> Reply {
     Reply::Done(Response::new(
         status,
@@ -224,6 +241,7 @@ impl Api {
                 json!({
                     "name": n.spec.name,
                     "kind": kind_str(n.spec.kind),
+                    "tags": tags(n.spec.kind),
                     "status": n.status(),
                     "control": n.control(),
                     "pid": n.pid(),

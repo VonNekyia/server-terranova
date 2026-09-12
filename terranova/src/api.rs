@@ -215,17 +215,11 @@ impl Api {
             (false, ["api", "mines"]) => self.mines(),
             (true, ["api", "mines", "open"]) => self.open_mines(&req),
             (true, ["api", "mines", "reap"]) => self.reap(&req),
-            (true, ["api", "mines", slot, "close"]) => match slot
-                .parse::<u8>()
-                .ok()
-                .and_then(|s| self.sup.node(&mines::name(s)))
-            {
-                Some(n) => {
-                    let sup = self.sup.clone();
-                    let ok = sup.stop_node(&n);
-                    ok_json(json!({ "stopped": ok }))
+            (true, ["api", "mines", slot, "close"]) => match slot.parse::<u8>().ok() {
+                Some(s) if self.sup.node(&mines::name(s)).is_some() => {
+                    ok_json(json!({ "stopped": self.sup.close_mine(s) }))
                 }
-                None => bad(404, "kein solcher Dungeon"),
+                _ => bad(404, "kein solcher Dungeon"),
             },
 
             _ => bad(404, "unbekannter Weg"),
@@ -321,18 +315,25 @@ impl Api {
             .iter()
             .map(|n| {
                 let opened = mines::opened_at(&n.spec.dir);
+                // Geschlossen laeuft die Uhr ab dem Schliessen - sonst
+                // stuende im Dashboard eine Restzeit, die nicht gilt.
+                let from = mines::expires_from(&n.spec.dir);
                 json!({
                     "name": n.spec.name,
                     "port": n.spec.port,
                     "status": n.status(),
                     "opened_at": opened,
+                    "closed": mines::closed_at(&n.spec.dir).is_some(),
                     "age_s": opened.map(|o| now.saturating_sub(o)),
-                    "expires_in_s": opened.map(|o| lifetime.as_secs().saturating_sub(now.saturating_sub(o))),
+                    "expires_in_s": from.map(|o| lifetime.as_secs().saturating_sub(now.saturating_sub(o))),
                 })
             })
             .collect();
         ok_json(json!({
             "slots": self.sup.cfg.mines.slots,
+            // Wie lange ein Dungeon lebt - das Dashboard sagt damit beim
+            // Schliessen, worauf man sich einlaesst.
+            "lifetime_s": lifetime.as_secs(),
             "mines": list,
             // Woraus sich ein dynamischer Server starten laesst, und was
             // gilt, wenn niemand waehlt.

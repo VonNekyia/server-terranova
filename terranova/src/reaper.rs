@@ -25,7 +25,13 @@ pub fn reap(sup: &Arc<Supervisor>, dry_run: bool, stop_running: bool) -> Vec<Str
         let node = sup.node(&name);
         let running = node.as_ref().is_some_and(|n| n.status() != Status::Stopped);
 
-        match mines::reap_decision(mines::opened_at(&dir), now, lifetime, running, stop_running) {
+        match mines::reap_decision(
+            mines::expires_from(&dir),
+            now,
+            lifetime,
+            running,
+            stop_running,
+        ) {
             Reap::Keep { remaining } => {
                 let m = remaining.as_secs() / 60;
                 done.push(format!("{name}: noch {}h{:02}m", m / 60, m % 60));

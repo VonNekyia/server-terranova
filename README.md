@@ -130,14 +130,20 @@ und ab. In der Datei gehört ihm nur der Block zwischen den beiden
 Markierungszeilen; alles andere darin bleibt unangetastet. Wer `mines.slots`
 ändert, muss dort also nichts nachziehen.
 
-Ein Dungeon bleibt **24 Stunden** offen. Einen Neustart des Netzwerks übersteht
-er als Verzeichnis, aber er fährt nicht von selbst wieder hoch — gestartet wird
-nur, was jemand öffnet (`mines.resume: false`). Abgeräumt wird er vom
-Supervisor selbst, im Takt von `schedule.reap_every`.
+Ein Dungeon läuft, solange es ihn gibt: ein Neustart des Netzwerks bringt ihn
+zurück, ein Absturz auch (`mines.resume`). Von selbst angelegt wird trotzdem
+keiner — nur `mine open` legt einen an. Nach **24 Stunden** ist er weg; der
+Supervisor räumt ihn im Takt von `schedule.reap_every` ab und fährt ihn dafür
+herunter, auch wenn gerade jemand darin steht. Wer drin ist, landet auf `main`.
+
+`Schließen` beendet ihn vorzeitig: er bleibt unten, der Proxy meldet ihn ab,
+und die Uhr fängt von vorn an — nach weiteren 24 Stunden ist er weg. Bis dahin
+holt `mine open --slot N` ihn samt seiner Welt zurück.
 
 Gelöscht heißt: Verzeichnis weg, das nächste `open` legt eine frische Welt an.
-Ein noch laufender Dungeon wird übersprungen, `--stop-running` beendet ihn
-vorher sauber. Abgeräumt wird über `servers\.trash`: erst umbenennen, dann
+`terranova mine reap` von Hand überspringt einen laufenden Dungeon —
+`--stop-running` beendet ihn vorher sauber. Der Supervisor und der Knopf im
+Dashboard tun das von sich aus, sonst käme nie einer an die Reihe. Abgeräumt wird über `servers\.trash`: erst umbenennen, dann
 löschen — das Umbenennen scheitert, solange jemand Dateien offen hält, also
 kann kein halb gelöschter Dungeon entstehen.
 

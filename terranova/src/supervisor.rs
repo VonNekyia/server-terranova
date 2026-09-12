@@ -640,9 +640,14 @@ impl Supervisor {
         if self.cfg.mines.resume && only.is_empty() {
             for slot in mines::existing(&self.paths.servers(), self.cfg.mines.slots) {
                 let dir = self.paths.server(&mines::name(slot));
+                // Geschlossen heisst geschlossen - der wartet nur noch aufs
+                // Abraeumen.
+                if mines::closed_at(&dir).is_some() {
+                    continue;
+                }
                 let age_ok = matches!(
                     mines::reap_decision(
-                        mines::opened_at(&dir),
+                        mines::expires_from(&dir),
                         mines::now_unix(),
                         self.cfg.mines.lifetime.0,
                         false,
@@ -859,6 +864,13 @@ impl Supervisor {
                 mines::name(slot)
             ));
         }
+        // War er geschlossen, ist er es jetzt nicht mehr: seine Welt kommt
+        // zurueck, und die Uhr laeuft wieder auf das urspruengliche Ende zu.
+        if mines::closed_at(&dir).is_some() {
+            mines::mark_open(&dir)?;
+            self.log(format!("{}: wieder geoeffnet", mines::name(slot)));
+        }
+
         // Erst jetzt: der Bauplan liest die Vorlage aus der Markierung.
         let spec = self.cfg.mine_node(&self.paths, slot);
         let node = {
@@ -927,6 +939,9 @@ impl Supervisor {
         };
         let open: Vec<(String, u16)> = mines::existing(&self.paths.servers(), self.cfg.mines.slots)
             .into_iter()
+            // Ein geschlossener Dungeon kommt nicht wieder hoch - dann soll der
+            // Proxy auch niemanden mehr dorthin schicken.
+            .filter(|slot| mines::closed_at(&self.paths.server(&mines::name(*slot))).is_none())
             .map(|slot| {
                 (
                     mines::name(slot),
@@ -957,6 +972,25 @@ impl Supervisor {
             )),
             Err(e) => self.log(format!("Proxy neu laden: {e}")),
         }
+    }
+
+    /// Schliesst einen Dungeon: stoppen und zum Abraeumen vormerken.
+    ///
+    /// Die Welt bleibt stehen - wer ihn binnen seiner Lebenszeit wieder
+    /// oeffnet, bekommt sie zurueck. Passiert das nicht, raeumt der Reaper ihn
+    /// ab, gerechnet ab jetzt und nicht ab dem Oeffnen: ein Dungeon, den
+    /// jemand nach dreiundzwanzig Stunden schliesst, soll nicht eine Stunde
+    /// spaeter verschwinden.
+    pub fn close_mine(self: &Arc<Self>, slot: u8) -> bool {
+        let Some(node) = self.node(&mines::name(slot)) else {
+            return false;
+        };
+        let ok = self.stop_node(&node);
+        if let Err(e) = mines::mark_closed(&node.spec.dir, mines::now_unix()) {
+            self.log(format!("{}: Markierung schreiben: {e}", node.spec.name));
+        }
+        self.sync_proxy_servers();
+        ok
     }
 
     /// Nimmt einen Knoten aus der Liste - fuer einen abgeraeumten Dungeon.

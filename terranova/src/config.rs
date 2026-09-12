@@ -162,9 +162,11 @@ pub struct Mines {
     #[serde(default = "default_mine_motd")]
     pub motd: String,
     /// Offene Dungeons nach einem Netzwerk-Neustart wieder hochfahren.
-    /// Aus, solange nichts anderes dasteht: ein Dungeon soll nur starten,
-    /// weil jemand ihn oeffnet.
-    #[serde(default)]
+    ///
+    /// An, solange nichts anderes dasteht: ein Dungeon existiert nur, weil
+    /// jemand ihn geoeffnet hat - dann soll er auch laufen. Von selbst
+    /// angelegt wird trotzdem keiner. Geschlossene bleiben unten.
+    #[serde(default = "default_true")]
     pub resume: bool,
     #[serde(default)]
     pub stop_timeout: Option<Dur>,
@@ -339,6 +341,9 @@ fn default_mine_template() -> String {
 }
 fn default_mine_motd() -> String {
     "Terranova Mine {n}".into()
+}
+fn default_true() -> bool {
+    true
 }
 fn default_reap_every() -> Dur {
     Dur(Duration::from_secs(15 * 60))

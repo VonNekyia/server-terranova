@@ -28,6 +28,14 @@ pub struct Marker {
     /// Vorgabe aus der Konfiguration.
     #[serde(default)]
     pub template: Option<String>,
+    /// Wann er geschlossen wurde, falls er geschlossen ist.
+    ///
+    /// Ein Dungeon laeuft, solange es ihn gibt - Abstuerze und Neustarts des
+    /// Netzwerks eingeschlossen. Geschlossen heisst: er bleibt unten und
+    /// bekommt von hier an noch einmal seine Lebenszeit, bevor er abgeraeumt
+    /// wird. Wer ihn vorher wieder oeffnet, bekommt seine Welt zurueck.
+    #[serde(default)]
+    pub closed_at: Option<u64>,
 }
 
 pub fn name(slot: u8) -> String {
@@ -51,21 +59,74 @@ pub fn write_marker(
     opened_at: u64,
     template: Option<&str>,
 ) -> io::Result<()> {
-    let m = Marker {
-        slot,
-        opened_at,
-        template: template.map(str::to_string),
-    };
+    write(
+        dir,
+        &Marker {
+            slot,
+            opened_at,
+            template: template.map(str::to_string),
+            closed_at: None,
+        },
+    )
+}
+
+fn write(dir: &Path, m: &Marker) -> io::Result<()> {
     fs::write(
         dir.join(MARKER),
-        serde_json::to_vec_pretty(&m).expect("Marker"),
+        serde_json::to_vec_pretty(m).expect("Marker"),
     )
+}
+
+/// Die Markierung, falls sie da und lesbar ist.
+pub fn read_marker(dir: &Path) -> Option<Marker> {
+    serde_json::from_str(&fs::read_to_string(dir.join(MARKER)).ok()?).ok()
+}
+
+/// Merkt an, dass dieser Dungeon geschlossen ist.
+///
+/// Ohne Markierung - ein Dungeon aus alter Zeit - gibt es nichts zu merken;
+/// dann bleibt es beim Anlegedatum, und er laeuft nach seiner urspruenglichen
+/// Zeit ab.
+pub fn mark_closed(dir: &Path, at: u64) -> io::Result<()> {
+    let Some(mut m) = read_marker(dir) else {
+        return Ok(());
+    };
+    m.closed_at = Some(at);
+    write(dir, &m)
+}
+
+/// Nimmt die Schliessung zurueck - der Dungeon ist wieder offen.
+pub fn mark_open(dir: &Path) -> io::Result<()> {
+    match read_marker(dir) {
+        Some(m) if m.closed_at.is_some() => write(
+            dir,
+            &Marker {
+                closed_at: None,
+                ..m
+            },
+        ),
+        _ => Ok(()),
+    }
+}
+
+/// Ist dieser Dungeon geschlossen, und seit wann?
+pub fn closed_at(dir: &Path) -> Option<u64> {
+    read_marker(dir)?.closed_at
+}
+
+/// Ab wann die Uhr fuer das Abraeumen laeuft.
+///
+/// Beim offenen Dungeon ist das der Zeitpunkt des Oeffnens. Beim
+/// geschlossenen der des Schliessens: er bekommt seine Zeit noch einmal, weil
+/// sonst ein Dungeon, den jemand nach 23 Stunden schliesst, eine Stunde
+/// spaeter weg waere - ohne dass jemand damit rechnet.
+pub fn expires_from(dir: &Path) -> Option<u64> {
+    closed_at(dir).or_else(|| opened_at(dir))
 }
 
 /// Aus welcher Vorlage dieser Dungeon entstand, falls bekannt.
 pub fn template_of(dir: &Path) -> Option<String> {
-    let text = fs::read_to_string(dir.join(MARKER)).ok()?;
-    serde_json::from_str::<Marker>(&text).ok()?.template
+    read_marker(dir)?.template
 }
 
 /// Welche Vorlagen sich als dynamischer Server starten lassen.
@@ -95,10 +156,8 @@ pub fn templates(templates_dir: &Path, static_names: &[String]) -> Vec<String> {
 /// Ein gerade abgeraeumter und sofort neu geoeffneter Dungeon waere sonst
 /// schon beim Oeffnen abgelaufen.
 pub fn opened_at(dir: &Path) -> Option<u64> {
-    if let Ok(text) = fs::read_to_string(dir.join(MARKER)) {
-        if let Ok(m) = serde_json::from_str::<Marker>(&text) {
-            return Some(m.opened_at);
-        }
+    if let Some(m) = read_marker(dir) {
+        return Some(m.opened_at);
     }
     fs::metadata(dir)
         .and_then(|m| m.created())
@@ -216,6 +275,35 @@ mod tests {
         assert_eq!(parse_name("mining-0"), None);
         assert_eq!(parse_name("mining-x"), None);
         assert_eq!(parse_name("main"), None);
+    }
+
+    #[test]
+    fn schliessen_stellt_die_uhr_neu() {
+        let d = &crate::testutil::tempdir("mine-close");
+        write_marker(d, 2, 1_000, Some("mining")).unwrap();
+        assert_eq!(expires_from(d), Some(1_000));
+        assert_eq!(closed_at(d), None);
+
+        // Geschlossen: ab jetzt laeuft die Zeit noch einmal.
+        mark_closed(d, 9_000).unwrap();
+        assert_eq!(closed_at(d), Some(9_000));
+        assert_eq!(expires_from(d), Some(9_000));
+        // Geoeffnet bleibt geoeffnet - die Vorlage ueberlebt beides.
+        assert_eq!(opened_at(d), Some(1_000));
+        assert_eq!(template_of(d).as_deref(), Some("mining"));
+
+        // Wieder geoeffnet: es zaehlt wieder das Oeffnen.
+        mark_open(d).unwrap();
+        assert_eq!(closed_at(d), None);
+        assert_eq!(expires_from(d), Some(1_000));
+    }
+
+    #[test]
+    fn ohne_markierung_gibt_es_nichts_zu_schliessen() {
+        let d = &crate::testutil::tempdir("mine-nomarker");
+        // Kein Fehler, aber auch keine Markierung aus dem Nichts.
+        mark_closed(d, 9_000).unwrap();
+        assert_eq!(closed_at(d), None);
     }
 
     #[test]

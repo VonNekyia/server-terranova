@@ -85,10 +85,11 @@ mines:
   memory: 2G
   lifetime: 24h
   motd: "Terranova Mine {n}"
-  # Offene Dungeons nach einem Neustart des Netzwerks wieder hochfahren.
-  # Aus: ein Dungeon startet nur, weil jemand ihn oeffnet - ein Neustart des
-  # Netzwerks laesst die offenen Ordner stehen, faehrt sie aber nicht hoch.
-  resume: false
+  # Ein Dungeon laeuft, solange es ihn gibt: nach einem Neustart des
+  # Netzwerks kommt er wieder hoch, nach einem Absturz auch. Von selbst
+  # angelegt wird trotzdem keiner - nur 'mine open' legt einen an.
+  # Geschlossene bleiben unten und warten aufs Abraeumen.
+  resume: true
 
 schedule:
   daily_restart:

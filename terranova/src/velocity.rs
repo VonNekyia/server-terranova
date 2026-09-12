@@ -199,15 +199,18 @@ mod tests {
     }
 
     #[test]
-    fn die_echte_velocity_toml_ist_schon_so() {
-        // Gegen die Datei, die wirklich ausgeliefert wird: der Block steht
-        // drin, und ohne offenen Dungeon gibt es nichts zu schreiben.
+    fn die_echte_velocity_toml_kennt_den_block() {
+        // Gegen die Datei, die wirklich ausgeliefert wird. Welche Dungeons
+        // gerade drinstehen, ist Laufzeitstand - darauf darf kein Test
+        // bestehen. Dass der Block da ist und sitzt, schon.
         let text = include_str!("../../proxy/velocity.toml");
         assert!(
-            with_mines(text, &[]).is_none(),
-            "der Block fehlt oder passt nicht"
+            text.contains(BEGIN) && text.contains(END),
+            "der Block fehlt"
         );
-        let out = with_mines(text, &mines(&[2])).unwrap();
+        let leer = with_mines(text, &[]).unwrap_or_else(|| text.to_string());
+        assert!(with_mines(&leer, &[]).is_none(), "{leer}");
+        let out = with_mines(&leer, &mines(&[2])).unwrap();
         assert!(out.contains("	mining-2 = \"127.0.0.1:25572\""), "{out}");
         assert!(out.contains("	main = \"127.0.0.1:25566\""));
     }

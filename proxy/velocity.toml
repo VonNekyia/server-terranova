@@ -41,7 +41,8 @@ forced-hosts = {}
 	# ausserhalb steht, bleibt unangetastet.
 	# Geoeffnet wird mit  terranova mine open
 	# von terranova verwaltet - offene Dungeons, nicht von Hand aendern
-	# gerade keiner offen
+	mining-1 = "127.0.0.1:25571"
+	mining-2 = "127.0.0.1:25572"
 	# Ende der Dungeons
 	# Wer sich verbindet, landet auf main.
 	try = ["main"]

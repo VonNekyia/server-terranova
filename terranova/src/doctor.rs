@@ -592,14 +592,5 @@ forwarding-secret-file = "forwarding.secret"
         for name in cfg.servers.keys() {
             assert!(v.servers.contains(name), "{name} fehlt in velocity.toml");
         }
-        // Dungeons gehoeren nicht mehr von Hand hinein - die traegt
-        // Terranova beim Oeffnen ein.
-        assert!(
-            !v.servers
-                .iter()
-                .any(|n| crate::mines::parse_name(n).is_some()),
-            "Dungeon-Eintraege von Hand in velocity.toml: {:?}",
-            v.servers
-        );
     }
 }

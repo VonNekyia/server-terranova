@@ -6,135 +6,253 @@
 <title>Terranova</title>
 <style>
   :root {
-    --bg: #14171c; --panel: #1b1f26; --line: #2a303a; --fg: #e6e9ef;
-    --dim: #8b93a3; --accent: #54c8ff; --ok: #58c878; --warn: #e0a33e;
-    --bad: #e05c5c; --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --bg: #0f1216; --panel: #171b22; --sunken: #0c0f14; --raised: #232a35;
+    --line: #262d38; --line-soft: #1f242d;
+    --fg: #e7ebf2; --dim: #8b93a3;
+    --accent: #56c8ff; --ok: #5ecb84; --warn: #e2a844; --bad: #e8635f;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    /* Der Kopf steht fest, die Konsole daneben soll genau bis unten reichen -
+       beide rechnen mit derselben Zahl. */
+    --head: 57px;
+    --gap: 16px;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--fg);
     font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* --- Kopf ---------------------------------------------------------------- */
   header {
-    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
-    padding: 14px 20px; border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    height: var(--head); padding: 0 18px;
+    background: rgba(15, 18, 22, .85); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
   }
-  h1 { font-size: 17px; margin: 0; font-weight: 600; }
-  h1 span { color: var(--accent); }
+  h1 {
+    font-size: 16px; margin: 0; font-weight: 650; letter-spacing: .2px;
+  }
+  .brand { display: flex; align-items: center; gap: 9px; }
+  /* Ein Punkt sagt auf einen Blick, woran man ist - noch bevor man die
+     Zeile daneben gelesen hat. */
+  .dot {
+    width: 8px; height: 8px; border-radius: 99px; background: var(--dim);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, .04);
+  }
+  .dot.ready { background: var(--ok); box-shadow: 0 0 0 3px rgba(94, 203, 132, .15); }
+  .dot.stopping { background: var(--warn); box-shadow: 0 0 0 3px rgba(226, 168, 68, .15); }
+  .dot.bad { background: var(--bad); box-shadow: 0 0 0 3px rgba(232, 99, 95, .15); }
+  .chip {
+    font-size: 11px; color: var(--accent); border: 1px solid var(--line);
+    background: rgba(86, 200, 255, .08); border-radius: 99px; padding: 1px 8px;
+    letter-spacing: .03em;
+  }
+  .chip:empty { display: none; }
+  .grow { flex: 1; }
   .dim { color: var(--dim); }
-  main { padding: 20px; display: grid; gap: 20px; max-width: 1100px; }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
-  section > h2 {
-    font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
-    color: var(--dim); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line);
+
+  /* --- Flaeche ------------------------------------------------------------- */
+  main {
+    display: grid; gap: var(--gap); padding: var(--gap);
+    grid-template-columns: minmax(0, 1fr) clamp(380px, 33vw, 560px);
+    align-items: start; max-width: 1680px; margin: 0 auto;
   }
+  .col { display: grid; gap: var(--gap); min-width: 0; }
+  section {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    overflow: hidden;
+  }
+  section > h2 {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--dim); font-weight: 600;
+    margin: 0; padding: 11px 16px; border-bottom: 1px solid var(--line-soft);
+  }
+  section > h2 .dim { text-transform: none; letter-spacing: 0; font-weight: 500; }
+  .hint { color: var(--dim); font-size: 13px; margin: 0; padding: 12px 16px 0; }
+
+  /* --- Tabellen ------------------------------------------------------------ */
   table { width: 100%; border-collapse: collapse; }
-  td, th { padding: 9px 16px; text-align: left; border-bottom: 1px solid var(--line); }
-  tr:last-child td { border-bottom: none; }
-  th { font-weight: 500; color: var(--dim); font-size: 12px; }
+  td, th { padding: 9px 16px; text-align: left; border-bottom: 1px solid var(--line-soft); }
+  thead th {
+    font-weight: 500; color: var(--dim); font-size: 11px;
+    text-transform: uppercase; letter-spacing: .05em;
+    padding-top: 8px; padding-bottom: 8px; background: rgba(255, 255, 255, .015);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { transition: background .12s; }
+  tbody tr:hover { background: rgba(255, 255, 255, .022); }
+  /* Wer gerade mitliest, soll die Zeile dazu wiederfinden. */
+  tbody tr.sel { background: rgba(86, 200, 255, .1); }
+  tbody tr.sel td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
   td.name { font-weight: 600; }
   td.num, th.num { font-variant-numeric: tabular-nums; color: var(--dim); }
+
   .badge {
-    display: inline-block; padding: 1px 8px; border-radius: 99px;
-    font-size: 12px; border: 1px solid currentColor;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 1px 9px 1px 7px; border-radius: 99px; font-size: 12px;
+    border: 1px solid currentColor;
+    background: color-mix(in srgb, currentColor 11%, transparent);
   }
-  /* Was ein Knoten ist: paper, proxy, database, valuedb, dungeon. Ob er
-     statisch oder dynamisch ist, sagt schon der Abschnitt, in dem er steht -
-     das steht deshalb nicht noch einmal als Schlagwort daneben. */
-  .tag {
-    display: inline-block; padding: 0 6px; border-radius: 4px;
-    font-size: 11px; color: var(--dim); border: 1px solid var(--line);
+  .badge::before {
+    content: ""; width: 5px; height: 5px; border-radius: 99px; background: currentColor;
   }
-  .tag + .tag { margin-left: 4px; }
-  .tag.dungeon { color: var(--accent); border-color: var(--accent); }
   .ready { color: var(--ok); } .stopped { color: var(--dim); }
   .starting, .stopping { color: var(--warn); }
   .crashloop, .conflict, .down { color: var(--bad); }
   .waiting { color: var(--dim); }
+
+  /* Was ein Knoten ist: paper, proxy, database, valuedb, dungeon. Ob er
+     statisch oder dynamisch ist, sagt schon der Abschnitt, in dem er steht -
+     das steht deshalb nicht noch einmal als Schlagwort daneben. */
+  .tag {
+    display: inline-block; padding: 1px 7px; border-radius: 5px;
+    font-size: 11px; color: var(--dim);
+    border: 1px solid var(--line); background: rgba(255, 255, 255, .02);
+  }
+  .tag + .tag { margin-left: 4px; }
+  .tag.dungeon { color: #8fd6ff; border-color: rgba(86, 200, 255, .35); background: rgba(86, 200, 255, .08); }
+  .tag.proxy { color: #c3a6ff; border-color: rgba(163, 130, 255, .3); background: rgba(163, 130, 255, .08); }
+  .tag.database { color: #ffc98a; border-color: rgba(226, 168, 68, .3); background: rgba(226, 168, 68, .08); }
+  .tag.valuedb { color: #ff9f9c; border-color: rgba(232, 99, 95, .28); background: rgba(232, 99, 95, .07); }
+  .tag.paper { color: #9fe3b6; border-color: rgba(94, 203, 132, .28); background: rgba(94, 203, 132, .07); }
+
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
   .adopted { color: var(--warn); font-size: 12px; }
+
+  /* --- Schaltflaechen ------------------------------------------------------ */
   button {
-    background: #262c36; color: var(--fg); border: 1px solid var(--line);
-    border-radius: 5px; padding: 4px 10px; cursor: pointer; font-size: 13px;
+    background: var(--raised); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 4px 11px; cursor: pointer; font-size: 13px;
+    font-family: inherit; transition: border-color .12s, color .12s, background .12s;
   }
   button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:active:not(:disabled) { background: #1b212a; }
   button:disabled { opacity: .35; cursor: default; }
+  button.primary { color: var(--accent); border-color: rgba(86, 200, 255, .35); background: rgba(86, 200, 255, .1); }
+  button.primary:hover:not(:disabled) { background: rgba(86, 200, 255, .18); }
   button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
   .actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+  .bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 11px 16px; border-top: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, .012);
+  }
+  .bar input[type=number], .bar select {
+    background: var(--sunken); color: var(--fg); font: inherit; font-size: 13px;
+    border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px;
+  }
+  .bar input[type=number] { width: 58px; }
+  .bar input:focus, .bar select:focus { outline: none; border-color: var(--accent); }
+
+  /* --- Konsole ------------------------------------------------------------- */
+  /* Sie steht rechts und bleibt stehen: links wird geblaettert, hier
+     mitgelesen. Beides gleichzeitig, ohne Springen. */
+  .console {
+    position: sticky; top: calc(var(--head) + var(--gap));
+    height: calc(100vh - var(--head) - 2 * var(--gap));
+    display: flex; flex-direction: column;
+  }
   #console {
-    font: 12px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word;
-    height: 340px; overflow-y: auto; padding: 12px 16px; margin: 0;
+    flex: 1; min-height: 0; margin: 0;
+    font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word;
+    overflow-y: auto; padding: 12px 16px; background: var(--sunken);
   }
   #console .err { color: var(--bad); }
   #console .sys { color: var(--accent); }
   #console .gap { color: var(--warn); font-style: italic; }
-  .inputrow { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
+  #console .tip { color: var(--dim); font-style: italic; }
+  #console::-webkit-scrollbar { width: 10px; }
+  #console::-webkit-scrollbar-thumb { background: #262d38; border-radius: 99px; border: 3px solid var(--sunken); }
+  .inputrow {
+    display: flex; gap: 8px; align-items: center;
+    padding: 10px 16px; border-top: 1px solid var(--line-soft);
+  }
+  .prompt { color: var(--accent); font: 14px var(--mono); }
   .inputrow input {
-    flex: 1; background: #12151a; color: var(--fg); border: 1px solid var(--line);
-    border-radius: 5px; padding: 6px 10px; font: 13px var(--mono);
+    flex: 1; min-width: 0; background: var(--sunken); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 6px 10px; font: 13px var(--mono);
   }
   .inputrow input:focus { outline: none; border-color: var(--accent); }
-  .bar { display: flex; gap: 8px; align-items: center; padding: 12px 16px; flex-wrap: wrap; }
-  .bar input[type=number] { width: 56px; background: #12151a; color: var(--fg);
-    border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; }
-  .bar select { background: #12151a; color: var(--fg); font-size: 13px;
-    border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; }
-  .bar select:focus { outline: none; border-color: var(--accent); }
+  .inputrow input:disabled { opacity: .5; }
+
   #toast {
     position: fixed; right: 20px; bottom: 20px; background: var(--panel);
     border: 1px solid var(--bad); color: var(--bad); padding: 10px 14px;
-    border-radius: 6px; max-width: 420px; display: none;
+    border-radius: 8px; max-width: 420px; display: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .45);
+  }
+
+  /* Schmaler Bildschirm: untereinander, und die Konsole klebt nicht mehr. */
+  @media (max-width: 1000px) {
+    main { grid-template-columns: minmax(0, 1fr); }
+    .console { position: static; height: auto; }
+    #console { height: 320px; flex: none; }
   }
 </style>
 </head>
 <body>
 <header>
-  <h1>Terranova<span id="rt"></span></h1>
+  <div class="brand">
+    <span class="dot" id="pulse"></span>
+    <h1>Terranova</h1>
+    <span class="chip" id="rt"></span>
+  </div>
   <span class="dim" id="sub">verbinde…</span>
-  <span style="flex:1"></span>
-  <button id="netstart">Netzwerk starten</button>
-  <button id="netstop" class="danger">Netzwerk herunterfahren</button>
+  <span class="grow"></span>
+  <button id="netstart" class="primary">Netzwerk starten</button>
+  <button id="netstop" class="danger">Herunterfahren</button>
 </header>
 
 <main>
-  <section>
-    <h2>Statische Server</h2>
-    <table>
-      <thead><tr>
-        <th>Name</th><th>Art</th><th>Zustand</th><th class="num">Port</th><th class="num">PID</th>
-        <th class="num">Laufzeit</th><th></th>
-      </tr></thead>
-      <tbody id="nodes"></tbody>
-    </table>
-  </section>
+  <div class="col">
+    <section>
+      <h2>Statische Server</h2>
+      <table>
+        <thead><tr>
+          <th>Name</th><th>Art</th><th>Zustand</th><th class="num">Port</th><th class="num">PID</th>
+          <th class="num">Laufzeit</th><th></th>
+        </tr></thead>
+        <tbody id="nodes"></tbody>
+      </table>
+    </section>
 
-  <section>
-    <h2>Dynamische Server</h2>
-    <p class="dim">Dungeons — werden auf Zuruf geöffnet und laufen nach ihrer
-      Zeit von selbst aus.</p>
-    <table><tbody id="mines"></tbody></table>
-    <div class="bar">
-      <button id="open">Öffnen</button>
-      <input type="number" id="count" value="1" min="1" max="99" title="wie viele">
-      <select id="template" title="aus welcher Vorlage"></select>
-      <span class="dim" id="slots"></span>
-      <span style="flex:1"></span>
-      <button id="reap">Abgelaufene abräumen</button>
-    </div>
-  </section>
+    <section>
+      <h2>Dynamische Server</h2>
+      <p class="hint">Dungeons — werden auf Zuruf geöffnet und laufen nach ihrer
+        Zeit von selbst aus.</p>
+      <table><tbody id="mines"></tbody></table>
+      <div class="bar">
+        <button id="open" class="primary">Öffnen</button>
+        <input type="number" id="count" value="1" min="1" max="99" title="wie viele">
+        <select id="template" title="aus welcher Vorlage"></select>
+        <span class="dim" id="slots"></span>
+        <span class="grow"></span>
+        <button id="reap">Abgelaufene abräumen</button>
+      </div>
+    </section>
 
-  <section>
-    <h2>Web</h2>
-    <table><tbody id="web"></tbody></table>
-  </section>
+    <section>
+      <h2>Web</h2>
+      <table><tbody id="web"></tbody></table>
+    </section>
+  </div>
 
-  <section>
+  <section class="console">
     <h2>Konsole <span class="dim" id="who"></span></h2>
-    <pre id="console"></pre>
+    <pre id="console"><span class="tip">Noch kein Server gewählt — links auf „Konsole“ klicken.</span>
+</pre>
     <div class="inputrow">
+      <span class="prompt">›</span>
       <input id="cmd" placeholder="Befehl an den Server – Eingabetaste schickt ihn ab" autocomplete="off" disabled>
-      <button id="send" disabled>Senden</button>
+      <button id="send" class="primary" disabled>Senden</button>
     </div>
   </section>
 </main>
@@ -247,6 +365,7 @@ function fillNode(r, n) {
   r.port.textContent = n.port;
   r.pid.textContent = n.pid ?? "–";
   r.up.textContent = secs(n.uptime_s);
+  r.tr.classList.toggle("sel", n.name === selected);
   const running = n.status !== "stopped";
   r.toggle._stop = running;
   r.toggle.textContent = running ? "Stopp" : "Start";
@@ -275,6 +394,7 @@ function watch(name) {
     stream.addEventListener(kind, e => line(e.data, kind));
   }
   stream.onerror = () => line("[Verbindung unterbrochen – wird erneut versucht]", "gap");
+  refresh();
 }
 
 async function send() {
@@ -337,10 +457,11 @@ async function refresh() {
   try {
     const s = await api("/api/status");
     ready = true;
-    $("#rt").textContent = " · " + s.runtime;
+    $("#rt").textContent = s.runtime;
     const up = s.nodes.filter(n => n.status === "ready").length;
     $("#sub").textContent = s.shutting_down
       ? "fährt herunter…" : `${up} von ${s.nodes.length} bereit`;
+    $("#pulse").className = "dot " + (s.shutting_down ? "stopping" : up ? "ready" : "");
     const body = $("#nodes");
     const seen = new Set();
     for (const n of s.nodes) {
@@ -371,6 +492,7 @@ async function refresh() {
       }
       for (const mine of m.mines) {
         const tr = document.createElement("tr");
+        if (mine.name === selected) tr.className = "sel";
         tr.innerHTML = `<td class="name">${mine.name}</td>
           <td class="tags">${tagHtml(["paper", "dungeon"])}</td>
           <td><span class="badge ${mine.status}">${mine.status}</span></td>
@@ -389,6 +511,7 @@ async function refresh() {
       }
     }
   } catch (e) {
+    $("#pulse").className = "dot bad";
     if (ready) $("#sub").textContent = "kein Supervisor erreichbar";
     else $("#sub").textContent = e.message;
   }

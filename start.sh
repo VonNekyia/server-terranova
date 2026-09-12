@@ -2,24 +2,32 @@
 # Startet das Terranova-Netzwerk. Alles Weitere macht terranova selbst;
 # diese Datei ist nur die Abkuerzung - das Gegenstueck zu start.bat.
 #
-# Im Repository liegt unter bin/ nur die Windows-Fassung: eine Programmdatei
-# je System einzuchecken hiesse, sie bei jeder Aenderung doppelt zu pflegen.
-# Fehlt die Linux-Fassung, wird sie hier einmalig aus den Quellen gebaut.
+# bin/terranova liegt fertig im Repository: statisch gebaut (musl), laeuft
+# also auf jeder x86_64-Distribution, ohne dass Rust installiert sein muss.
+# Auf anderen Architekturen - etwa einem ARM-Rechner - wird einmalig aus den
+# Quellen gebaut und als bin/terranova-<arch> abgelegt.
 set -e
 cd "$(dirname "$0")"
 
-if [ ! -x bin/terranova ]; then
-    if ! command -v cargo >/dev/null 2>&1; then
-        echo "bin/terranova fehlt, und cargo ist nicht installiert." >&2
-        echo "Entweder Rust einrichten (https://rustup.rs) und noch einmal" >&2
-        echo "starten, oder die fertige Programmdatei aus den CI-Artefakten" >&2
-        echo "nach bin/terranova legen und ausfuehrbar machen." >&2
+arch=$(uname -m)
+bin=bin/terranova
+[ "$arch" = "x86_64" ] || bin="bin/terranova-$arch"
+
+if [ ! -x "$bin" ]; then
+    if [ -f "$bin" ]; then
+        # Aus einem Klon unter Windows kommt die Datei ohne Ausfuehrungsrecht.
+        chmod +x "$bin"
+    elif ! command -v cargo >/dev/null 2>&1; then
+        echo "$bin fehlt, und cargo ist nicht installiert." >&2
+        echo "Fuer $arch liegt keine fertige Programmdatei bei - Rust einrichten" >&2
+        echo "(https://rustup.rs) und noch einmal starten." >&2
         exit 1
+    else
+        echo "[start] $bin fehlt - wird einmalig gebaut..."
+        cargo build --release --manifest-path terranova/Cargo.toml
+        mkdir -p bin
+        cp terranova/target/release/terranova "$bin"
     fi
-    echo "[start] bin/terranova fehlt - wird einmalig gebaut..."
-    cargo build --release --manifest-path terranova/Cargo.toml
-    mkdir -p bin
-    cp terranova/target/release/terranova bin/terranova
 fi
 
-exec bin/terranova start "$@"
+exec "$bin" start "$@"

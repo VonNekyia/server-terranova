@@ -12,6 +12,7 @@
 
 # Binary files should be left untouched
 *.exe           binary
+bin/terranova   binary
 *.jar           binary
 *.zip           binary
 *.png           binary

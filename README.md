@@ -174,6 +174,7 @@ kann kein halb gelöschter Dungeon entstehen.
 start.bat                   ruft nur bin\terranova.exe start auf
 start.sh                    dasselbe unter Linux
 bin/terranova.exe           das Programm, versioniert
+bin/terranova               dasselbe fuer Linux x86_64, statisch gebaut
 terranova.yml               was läuft, mit wie viel Speicher, auf welchem Port
 terranova/                  sein Quelltext (Rust)
   src/win.rs                Prozesse, Ports, Zeit — über die Windows-API

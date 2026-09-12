@@ -72,6 +72,8 @@ CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=rust-lld cargo build --release --t
 start_minimal.bat
 ```
 
+unter Linux `./start_minimal.sh`.
+
 Datenbanken, Proxy und `main` — sonst nichts. `build`, `farm` und die Dungeons
 bleiben aus; zusammen belegen die rund acht Gigabyte, und auf einem knappen
 Rechner ist das der Unterschied zwischen spielbar und nicht. Dahinter steckt
@@ -185,6 +187,7 @@ kann kein halb gelöschter Dungeon entstehen.
 ```
 start.bat                   ruft nur bin\terranova.exe start auf
 start.sh                    dasselbe unter Linux
+start_minimal.bat / .sh     nur Datenbanken, Proxy und main
 bin/terranova.exe           das Programm, versioniert
 bin/terranova               dasselbe fuer Linux x86_64, statisch gebaut
 terranova.yml               was läuft, mit wie viel Speicher, auf welchem Port

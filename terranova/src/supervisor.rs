@@ -738,6 +738,9 @@ impl Supervisor {
     pub fn start_deps(self: &Arc<Self>) -> io::Result<()> {
         let mut log = |m: &str| self.log(m);
         if self.cfg.runtime() == Runtime::Native {
+            // Zuerst: ohne Java startet hinterher kein einziger Server, und
+            // dann haette MariaDB umsonst gewartet.
+            deps::ensure_java(&self.paths, &self.cfg, &mut log)?;
             deps::ensure_mariadb(&self.paths, &self.cfg, &mut log)?;
             deps::ensure_redis(&self.paths, &self.cfg, &mut log)?;
         } else {

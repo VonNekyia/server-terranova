@@ -68,6 +68,24 @@ pub struct Java {
     pub flags: JavaFlags,
     #[serde(default)]
     pub extra: Vec<String>,
+    /// Welche Java-Hauptversion die Server mindestens brauchen. Paper
+    /// schreibt sie in sein Jar (version.json -> java_version).
+    #[serde(default = "default_java_version")]
+    pub version: u32,
+    /// Was nachgeladen wird, wenn kein passendes Java da ist.
+    #[serde(default)]
+    pub download: Option<JavaDownload>,
+}
+
+/// Ein festgenageltes Temurin-JRE: welcher Build, und je Plattform die
+/// Pruefsumme des Archivs.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct JavaDownload {
+    /// So, wie Adoptium ihn nennt, etwa "jdk-25.0.4.1+1"
+    pub release: String,
+    /// "windows-x64", "linux-x64", "linux-aarch64" -> sha256
+    pub sha256: BTreeMap<String, String>,
 }
 
 impl Default for Java {
@@ -77,6 +95,8 @@ impl Default for Java {
             image: default_java_image(),
             flags: JavaFlags::default(),
             extra: Vec::new(),
+            version: default_java_version(),
+            download: None,
         }
     }
 }
@@ -329,6 +349,9 @@ fn default_java_path() -> String {
 }
 fn default_java_image() -> String {
     "eclipse-temurin:25-jre".into()
+}
+fn default_java_version() -> u32 {
+    25
 }
 fn default_proxy_dir() -> PathBuf {
     PathBuf::from("proxy")

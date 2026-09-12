@@ -3,6 +3,8 @@
 use std::fmt::Write as _;
 use std::fs;
 use std::net::ToSocketAddrs as _;
+// Nur noch fuer die geplante Windows-Aufgabe; Java fragt deps ab.
+#[cfg(windows)]
 use std::process::{Command, Stdio};
 
 use crate::config::{Config, Runtime};
@@ -51,13 +53,24 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
 
     // --- Java ---------------------------------------------------------------
     if cfg.runtime() == Runtime::Native {
-        let java = std::env::var("TERRANOVA_JAVA").unwrap_or_else(|_| cfg.java.path.clone());
-        match java_version(&java) {
-            Some(v) => add(Level::Ok, "Java", format!("{java}: {v}")),
-            None => add(
+        use crate::deps::JavaSource;
+        let want = cfg.java.version;
+        let (java, source) = crate::deps::resolve_java(paths, &cfg.java);
+        let line = crate::deps::java_version_line(&java).unwrap_or_default();
+        let shown = java.display();
+        match source {
+            JavaSource::Env => add(Level::Ok, "Java", format!("TERRANOVA_JAVA {shown}: {line}")),
+            JavaSource::Configured => add(Level::Ok, "Java", format!("{shown}: {line}")),
+            JavaSource::Bundled => add(Level::Ok, "Java", format!("nachgeladen, {shown}: {line}")),
+            JavaSource::Missing if cfg.java.download.is_some() => add(
+                Level::Warn,
+                "Java",
+                format!("kein Java {want} gefunden - der naechste Start laedt Temurin {want} nach (ca. 60 MB)"),
+            ),
+            JavaSource::Missing => add(
                 Level::Fail,
                 "Java",
-                format!("'{java}' laesst sich nicht ausfuehren - installieren oder TERRANOVA_JAVA setzen"),
+                format!("kein Java {want} gefunden - installieren oder TERRANOVA_JAVA setzen"),
             ),
         }
     }
@@ -509,15 +522,6 @@ fn host_of(url: &str) -> Option<String> {
         host.split(':').next()?
     };
     (!host.is_empty()).then(|| host.to_string())
-}
-
-fn java_version(java: &str) -> Option<String> {
-    let mut cmd = Command::new(java);
-    cmd.arg("-version").stdin(Stdio::null());
-    let out = sys::hide_window(&mut cmd).output().ok()?;
-    // java -version schreibt nach stderr
-    let text = String::from_utf8_lossy(&out.stderr);
-    text.lines().next().map(|l| l.trim().to_string())
 }
 
 /// Ob noch eine geplante Windows-Aufgabe fuer den Neustart eingetragen ist.

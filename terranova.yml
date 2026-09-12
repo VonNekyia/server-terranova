@@ -12,11 +12,24 @@
 runtime: auto
 
 java:
-  # native: welches java. Die Umgebungsvariable TERRANOVA_JAVA uebersteuert.
+  # Welches java. Die Umgebungsvariable TERRANOVA_JAVA uebersteuert.
   path: java
+  # Mindestens diese Hauptversion - Paper 26.2 schreibt 25 in sein Jar
+  # (version.json -> java_version). Ein aelteres java unter path zaehlt als
+  # nicht vorhanden.
+  version: 25
+  # Ist kein passendes Java da, laedt Terranova dieses JRE nach runtime/java
+  # herunter - unter Windows wie unter Linux. Die Pruefsummen stammen aus den
+  # .sha256.txt, die Adoptium neben jedes Archiv legt.
+  download:
+    release: "jdk-25.0.4.1+1"
+    sha256:
+      windows-x64: 4c95451cea98556def2c54f7782933f52a26d4a36bd85e1d59f0364464828b07
+      linux-x64: 1731a34baadec5479258ea0202e4d5d865d2efeee60cb0c7d7eb056fe96ca219
+      linux-aarch64: 34828cbb93ed31c281c84ecb31ddab655d11a802f263c1fc019d42e9e0230fed
   # docker: welches Image
   image: "eclipse-temurin:25-jre"
-  # aikar = die Aikar-Flags wie bisher in network.ps1, none = nur -Xms/-Xmx
+  # aikar = die Aikar-Flags, none = nur -Xms/-Xmx
   flags: aikar
 
 # MariaDB und Redis. Unter Windows bringt Terranova beide selbst mit und

@@ -24,8 +24,12 @@ Die Server selbst haben **kein eigenes Fenster** mehr. An ihre Konsole kommt
 man mit `terranova console <name>` oder über das Dashboard — von überall, auch
 aus einem zweiten Terminal.
 
-Voraussetzung ist eine Java-Laufzeit. Getestet mit Java 25 und 26. Mit
-`TERRANOVA_JAVA=<Pfad zu java.exe>` lässt sich eine bestimmte erzwingen.
+Java muss nicht installiert sein. Paper verlangt mindestens Java 25
+(`java.version` in `terranova.yml`). Findet Terranova unter `java.path` ein
+passendes, nimmt es das — sonst lädt es beim ersten Start ein festgenageltes
+Temurin-JRE nach `runtime/java` herunter (ca. 60 MB, Prüfsumme wie bei
+MariaDB). Mit `TERRANOVA_JAVA=<Pfad zu java>` lässt sich ein bestimmtes
+erzwingen; `terranova doctor` zeigt, welches benutzt wird.
 
 ### Linux
 
@@ -38,8 +42,9 @@ oder gleich `bin/terranova start`. Dieselben Befehle, dieselbe
 Prozessverwaltung: statt der Windows-API liest Terranova dort `/proc`, und
 zum Stoppen gibt es mit `SIGTERM` einen Weg, den es unter Windows nicht gibt.
 
-Anders als unter Windows lädt Terranova hier **nichts** herunter. MariaDB und
-Redis kommen aus der Distribution:
+Anders als unter Windows lädt Terranova hier MariaDB und Redis **nicht**
+herunter — die kommen aus der Distribution. Java dagegen schon, wenn keines
+passt: die Paketquellen hängen Paper oft Jahre hinterher.
 
 ```
 sudo apt install mariadb-server redis-server
@@ -49,10 +54,17 @@ Fehlt eines von beiden, sagt Terranova beim Start, wie es hereinkommt. Das
 Datenverzeichnis unter `runtime/` gehört trotzdem Terranova; eine
 Systeminstanz auf 3306 bleibt unberührt.
 
-Unter `bin/` liegt nur die Windows-Programmdatei — eine je System einzuchecken
-hieße, sie bei jeder Änderung doppelt zu pflegen. `start.sh` baut die
-Linux-Fassung deshalb beim ersten Mal selbst, sofern Rust installiert ist.
-Fertige Binaries für x86_64 und aarch64 fallen ansonsten in der CI an.
+Unter `bin/` liegen beide Programmdateien: `terranova.exe` und `terranova`,
+letztere statisch gegen musl gebaut, also ohne Abhängigkeit von der glibc der
+Distribution. Auf anderen Architekturen baut `start.sh` beim ersten Mal selbst,
+sofern Rust installiert ist, und legt das Ergebnis als `bin/terranova-<arch>` ab.
+
+Neu bauen, von Windows aus:
+
+```
+rustup target add x86_64-unknown-linux-musl
+CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=rust-lld cargo build --release --target x86_64-unknown-linux-musl
+```
 
 ### Nur das Nötigste
 

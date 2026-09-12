@@ -1,0 +1,223 @@
+# Karpfenfische - Cyprinids: the carp family and its small relatives.
+
+# Elritze — Phoxinus phoxinus
+# Rekordlänge (TL): etwa 14 cm — Quelle: FishBase / Kottelat & Freyhof
+# Lebensraum: kühle Bäche, Flüsse und Seeufer mit sauberem, sauerstoffreichem Wasser
+# Wassertiefe: überwiegend flach | Temperatur: kalt bis gemäßigt | Aktivität: tagaktiv
+eurasian_minnow:
+  lore:
+    - "Ein winziger Lichtblitz tanzt über sauberem Kies."
+  fish_name: "<gray>Elritze</gray>"
+  fish_item: "nexo:eurasian_minnow"
+
+  max_length: 15
+  level: 1
+
+  water_type: [river, lake]
+  vegetation: [cold, temperate]
+  depth: [shallow]
+  modifier: [swarm]
+  condition: [day]
+
+  spawn_weight: 150
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 1
+
+# Rotauge — Rutilus rutilus
+# Rekordlänge (TL): 50,2 cm — Quelle: FishBase Species Summary, Rutilus rutilus
+# Lebensraum: Seen, langsamere Flüsse, Kanäle und Nebengewässer
+# Wassertiefe: überwiegend ufernah bis mitteltief | Temperatur: gemäßigt | Aktivität: überwiegend tagaktiv
+common_roach:
+  lore:
+    - "Rote Flossen leuchten unter ruhigem Süßwasser."
+  fish_name: "<gray>Rotauge</gray>"
+  fish_item: "nexo:common_roach"
+
+  max_length: 52
+  level: 2
+
+  water_type: [river, lake]
+  vegetation: [temperate]
+
+  spawn_weight: 145
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 3
+
+# Rotfeder — Scardinius erythrophthalmus
+# Rekordlänge (TL): etwa 61,7 cm — Quelle: FishBase Species Summary, Scardinius erythrophthalmus
+# Lebensraum: pflanzenreiche Seen, Altarme und langsam fließende Gewässer
+# Wassertiefe: überwiegend flach und ufernah | Temperatur: gemäßigt | Aktivität: tagaktiv
+common_rudd:
+  lore:
+    - "Scharlachrote Flossen leuchten zwischen schwimmenden Blättern."
+  fish_name: "<gray>Rotfeder</gray>"
+  fish_item: "nexo:common_rudd"
+
+  max_length: 63
+  level: 2
+
+  water_type: [river, lake]
+  vegetation: [temperate]
+  depth: [shallow]
+  condition: [day]
+
+  spawn_weight: 115
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 3
+
+# Karausche — Carassius carassius
+# Rekordlänge (TL): 64 cm — Quelle: FishBase Species Summary, Carassius carassius
+# Lebensraum: kleine Seen, Teiche, Altarme und langsam fließende Gewässer
+# Wassertiefe: überwiegend flach | Temperatur: kalt bis warm tolerant | Aktivität: Tag und Dämmerung
+crucian_carp:
+  lore:
+    - "Ein bronzener Überlebenskünstler ruht zwischen Wasserpflanzen."
+  fish_name: "<gray>Karausche</gray>"
+  fish_item: "nexo:crucian_carp"
+
+  max_length: 65
+  level: 2
+
+  water_type: [river, lake]
+  depth: [shallow]
+
+  spawn_weight: 110
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 3
+
+# Goldfisch — Carassius auratus
+# Rekordlänge (TL): etwa 59 cm — Quelle: FishBase Species Summary, Carassius auratus
+# Lebensraum: langsam fließende oder stehende Süßgewässer mit Vegetation
+# Wassertiefe: überwiegend flach | Temperatur: sehr tolerant, kalt bis warm | Aktivität: tagaktiv
+goldfish:
+  lore:
+    - "Ein kleiner goldener Funke treibt durch stilles Wasser."
+  fish_name: "<gray>Goldfisch</gray>"
+  fish_item: "nexo:goldfish"
+
+  max_length: 60
+  level: 2
+
+  water_type: [river, lake]
+  depth: [shallow]
+
+  spawn_weight: 95
+  rarity: "uncommon"
+
+# Döbel — Squalius cephalus
+# Rekordlänge (TL): etwa 60 cm — Quelle: FishBase Species Summary, Squalius cephalus
+# Lebensraum: Flüsse, Bäche und teilweise Seen; von strömend bis ruhig
+# Wassertiefe: flach bis mitteltief | Temperatur: gemäßigt | Aktivität: überwiegend tagaktiv
+european_chub:
+  lore:
+    - "Eine breite silberne Gestalt steht ruhig in der Strömung."
+  fish_name: "<gray>Döbel</gray>"
+  fish_item: "nexo:european_chub"
+
+  max_length: 61
+  level: 3
+
+  water_type: [river, lake]
+  vegetation: [temperate]
+
+  spawn_weight: 130
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 4
+
+# Schleie — Tinca tinca
+# Rekordlänge (TL): etwa 70 cm — Quelle: FishBase Species Summary, Tinca tinca
+# Lebensraum: warme, pflanzenreiche Seen, Teiche und langsam fließende Gewässer
+# Wassertiefe: vor allem flache Vegetationszonen | Temperatur: gemäßigt bis warm
+# Aktivität: besonders Morgen-, Abenddämmerung und Nacht
+tench:
+  lore:
+    - "Olivgrüne Schuppen gleiten lautlos durch dichte Pflanzen."
+  fish_name: "<gray>Schleie</gray>"
+  fish_item: "nexo:tench"
+
+  max_length: 71
+  level: 4
+
+  water_type: [river, lake]
+  vegetation: [temperate, warm]
+  depth: [shallow]
+
+  spawn_weight: 100
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 4
+
+# Barbe — Barbus barbus
+# Rekordlänge (TL): etwa 120 cm — Quelle: FishBase / europäische Süßwasserliteratur
+# Lebensraum: größere, sauerstoffreiche Flüsse mit kräftiger Strömung und Kiesgrund
+# Wassertiefe: bodennah in Flüssen | Temperatur: gemäßigt | Aktivität: besonders Dämmerung und Nacht
+common_barbel:
+  lore:
+    - "Vier Barteln durchsuchen den Kies unter der Strömung."
+  fish_name: "<gray>Barbe</gray>"
+  fish_item: "nexo:common_barbel"
+
+  max_length: 121
+  level: 6
+
+  water_type: [river]
+  vegetation: [temperate]
+
+  spawn_weight: 100
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 4
+
+# Karpfen — Cyprinus carpio
+# Rekordlänge (TL): etwa 120 cm — Quelle: FishBase Species Summary, Cyprinus carpio
+# Lebensraum: Seen, Teiche und langsam fließende Flüsse mit weichem Grund
+# Wassertiefe: flach bis mitteltief | Temperatur: gemäßigt bis warm | Aktivität: Tag, Dämmerung und Nacht
+common_carp:
+  lore:
+    - "Schwere Bronzeschuppen rollen durch trübes Wasser."
+  fish_name: "<gray>Karpfen</gray>"
+  fish_item: "nexo:common_carp"
+
+  max_length: 121
+  level: 6
+
+  water_type: [river, lake]
+  vegetation: [temperate, warm]
+
+  spawn_weight: 120
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 5
+
+# Höhlenschmerle — Eidinemacheilus smithi
+# Artfestlegung: Blinde Höhlenschmerle, Eidinemacheilus smithi
+# Rekordlänge: etwa 6,4 cm — Quelle: FishBase / Nemacheilidae-Artdaten
+# Lebensraum: permanente unterirdische Höhlengewässer
+# Wassertiefe: flache Höhlenbecken und unterirdische Wasserläufe
+# Aktivität: nicht an Tag oder Nacht gebunden
+blind_cave_loach:
+  lore:
+    - "Ein winziger blinder Wanderer tastet den Höhlenboden ab."
+  fish_name: "<aqua>Höhlenschmerle</aqua>"
+  fish_item: "nexo:blind_cave_loach"
+
+  max_length: 8
+  level: 8
+
+  water_type: [cave]
+
+  spawn_weight: 60
+  rarity: "rare"

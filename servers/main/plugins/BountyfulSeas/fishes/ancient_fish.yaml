@@ -1,0 +1,92 @@
+# Urfische - Lineages that were old before the others arrived.
+
+# Tarpon — Megalops atlanticus
+# Rekordlänge (TL): etwa 250 cm — Quelle: FishBase Species Summary, Megalops atlanticus
+# Lebensraum: Küsten, Lagunen, Ästuare, Flüsse und teilweise Binnengewässer
+# Wassertiefe: 0–40 m, meist 0–15 m | Temperatur: 10–40 °C | Aktivität: häufig Dämmerung und Nacht
+atlantic_tarpon:
+  lore:
+    - "Ein silberner Riese durchbricht die warme Wasseroberfläche."
+  fish_name: "<light_purple>Tarpon</light_purple>"
+  fish_item: "nexo:atlantic_tarpon"
+
+  max_length: 251
+  level: 18
+
+  water_type: [ocean, river, lake]
+  vegetation: [warm]
+  depth: [shallow]
+
+  spawn_weight: 18
+  rarity: "epic"
+
+  on_eat:
+    saturation: 6
+
+# Alligatorhecht — Atractosteus spatula
+# Rekordlänge (TL): etwa 305 cm — Quelle: FishBase Species Summary, Atractosteus spatula
+# Lebensraum: große langsame Flüsse, Seen, Bayous und Sümpfe Nordamerikas
+# Wassertiefe: überwiegend flache bis mittlere Bereiche | Temperatur: subtropisch
+# Aktivität: häufig Dämmerung und Nacht
+alligator_gar:
+  lore:
+    - "Uralte Panzerung schützt ein Maul voller Zähne."
+  fish_name: "<gradient:#84cc16:#d97706>Alligatorhecht</gradient>"
+  fish_item: "nexo:alligator_gar"
+
+  max_length: 306
+  level: 22
+
+  water_type: [river, lake]
+
+  spawn_weight: 4
+  rarity: "legendary"
+
+  on_eat:
+    saturation: 6
+
+# Stör — Acipenser sturio
+# Artfestlegung: Europäischer Stör, Acipenser sturio
+# Rekordlänge (TL): 600 cm — Quelle: FishBase Species Summary, Acipenser sturio
+# Lebensraum: adulte Tiere im Küstenmeer, Fortpflanzung in großen Flüssen
+# Wassertiefe: überwiegend bodennah | Temperatur: gemäßigt | Aktivität: häufig Dämmerung und Nacht
+european_sturgeon:
+  lore:
+    - "Ein gepanzerter Riese aus einer längst vergangenen Zeit."
+  fish_name: "<gradient:#d1d5db:#f59e0b>Stör</gradient>"
+  fish_item: "nexo:european_sturgeon"
+
+  max_length: 601
+  level: 23
+
+  water_type: [ocean, river]
+  vegetation: [temperate]
+
+  spawn_weight: 3
+  rarity: "legendary"
+
+  on_eat:
+    saturation: 7
+
+# Arapaima — Arapaima gigas
+# Rekordlänge (TL): etwa 450 cm — Quelle: FishBase / historische Amazonas-Nachweise
+# Lebensraum: Amazonasbecken, Überschwemmungsseen, Flüsse und langsam fließende Gewässer
+# Wassertiefe: überwiegend flach | Temperatur: etwa 24–31 °C | Aktivität: Tag und Dämmerung
+arapaima:
+  lore:
+    - "Ein rotgeschuppter Riese durchbricht die Oberfläche zum Atmen."
+  fish_name: "<gradient:#dc2626:#fbbf24>Arapaima</gradient>"
+  fish_item: "nexo:arapaima"
+
+  max_length: 451
+  level: 24
+
+  water_type: [river, lake]
+  vegetation: [warm]
+  depth: [shallow]
+
+  spawn_weight: 3
+  rarity: "legendary"
+
+  on_eat:
+    saturation: 7

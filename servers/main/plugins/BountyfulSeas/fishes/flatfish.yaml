@@ -1,0 +1,23 @@
+# Plattfische - Flatfish - bony fish that gave up on symmetry.
+
+# Scholle — Pleuronectes platessa
+# Rekordlänge (TL): etwa 100 cm — Quelle: FishBase Species Summary, Pleuronectes platessa
+# Lebensraum: sandige und schlammige Böden des Nordostatlantiks
+# Wassertiefe: 0–200 m, meist 10–50 m | Temperatur: 2–15 °C | Aktivität: überwiegend nachts
+european_plaice:
+  lore:
+    - "Ein gefleckter Schatten verschmilzt mit dem Sand."
+  fish_name: "<aqua>Scholle</aqua>"
+  fish_item: "nexo:european_plaice"
+
+  max_length: 101
+  level: 6
+
+  water_type: [ocean]
+  vegetation: [cold, temperate]
+
+  spawn_weight: 65
+  rarity: "rare"
+
+  on_eat:
+    saturation: 4

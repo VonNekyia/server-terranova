@@ -1,0 +1,121 @@
+# Uebrige Knochenfische - The ones that fit nowhere else.
+
+# Knochenfische - Bony fish - the ordinary shape of a fish, done well.
+
+# Hering — Clupea harengus
+# Rekordlänge (TL): etwa 45 cm — Quelle: FishBase Species Summary, Clupea harengus
+# Lebensraum: pelagische Schwärme im Nordatlantik und angrenzenden Meeren
+# Wassertiefe: 0–364 m, meist 0–200 m | Temperatur: 0–18 °C | Aktivität: Tag und Nacht
+atlantic_herring:
+  lore:
+    - "Silberne Schuppen verschwinden in einem rastlosen Schwarm."
+  fish_name: "<gray>Hering</gray>"
+  fish_item: "nexo:atlantic_herring"
+
+  max_length: 46
+  level: 1
+
+  water_type: [ocean]
+  vegetation: [cold, temperate]
+  modifier: [swarm]
+
+  spawn_weight: 140
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 3
+
+# Sardine — Sardina pilchardus
+# Rekordlänge: etwa 30 cm Gesamtlänge — Quelle: FishBase Species Summary, Sardina pilchardus
+# Lebensraum: küstennahe pelagische Schwärme im Nordostatlantik und Mittelmeer
+# Wassertiefe: nachts etwa 10–35 m, tags meist 25–100 m | Temperatur: gemäßigt | Aktivität: Tag und Nacht
+european_pilchard:
+  lore:
+    - "Ein winziger Silberfunke in einer wandernden Wolke."
+  fish_name: "<gray>Sardine</gray>"
+  fish_item: "nexo:european_pilchard"
+
+  max_length: 31
+  level: 1
+
+  water_type: [ocean]
+  vegetation: [temperate]
+  modifier: [swarm]
+
+  spawn_weight: 135
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 2
+
+# Kugelfisch — Takifugu rubripes
+# Artfestlegung: Tiger-Kugelfisch, Takifugu rubripes
+# Rekordlänge (TL): 80 cm — Quelle: FishBase Species Summary, Takifugu rubripes
+# Lebensraum: nordwestpazifische Küsten und Buchten, Jungtiere auch in Brackwasser
+# Wassertiefe: küstennah bis offshore | Temperatur: gemäßigt bis warm | Aktivität: überwiegend tagaktiv
+tiger_pufferfish:
+  lore:
+    - "Hinter seiner runden Gestalt verbirgt sich tödliches Gift."
+  fish_name: "<light_purple>Kugelfisch</light_purple>"
+  fish_item: "nexo:tiger_pufferfish"
+
+  max_length: 81
+  level: 9
+
+  water_type: [ocean]
+  vegetation: [temperate, warm]
+
+  spawn_weight: 20
+  rarity: "epic"
+
+  on_eat:
+    saturation: 2
+    effects:
+      - type: "poison"
+        duration: 200
+
+# Seeteufel — Lophius piscatorius
+# Rekordlänge (TL): etwa 200 cm — Quelle: FishBase Species Summary, Lophius piscatorius
+# Lebensraum: sandige, schlammige und felsige Meeresböden
+# Wassertiefe: etwa 20–1000 m | Temperatur: kühl bis gemäßigt | Aktivität: lauernder Bodenjäger
+anglerfish:
+  lore:
+    - "Ein gewaltiges Maul wartet geduldig am dunklen Grund."
+  fish_name: "<gray>Seeteufel</gray>"
+  fish_item: "nexo:anglerfish"
+
+  max_length: 201
+  level: 13
+
+  water_type: [ocean]
+  vegetation: [cold, temperate]
+  depth: [deep]
+
+  spawn_weight: 70
+  rarity: "uncommon"
+
+  on_eat:
+    saturation: 5
+
+# Wels — Silurus glanis
+# Rekordlänge (TL): 273 cm — Quelle: FishBase Species Summary, Silurus glanis
+# Lebensraum: große Flüsse, Altarme und vegetationsreiche Seen
+# Wassertiefe: 0–30 m | Temperatur: 4–20 °C | Aktivität: nachtaktiv
+wels_catfish:
+  lore:
+    - "Lange Barteln gleiten durch das schwarze Wasser."
+  fish_name: "<aqua>Wels</aqua>"
+  fish_item: "nexo:wels_catfish"
+
+  max_length: 274
+  level: 19
+
+  water_type: [river, lake]
+  vegetation: [temperate]
+  condition: [night]
+
+  spawn_weight: 35
+  rarity: "rare"
+
+  on_eat:
+    saturation: 6

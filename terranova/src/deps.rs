@@ -79,6 +79,27 @@ pub fn mariadb_server(_paths: &Paths, _version: &str) -> PathBuf {
     which(&["mariadbd", "mysqld"]).unwrap_or_else(|| PathBuf::from("mariadbd"))
 }
 
+/// Wo MariaDB ihren Unix-Socket anlegt.
+///
+/// Mit --no-defaults nimmt mariadbd den eingebauten Pfad, unter Debian und
+/// Ubuntu /run/mysqld/mysqld.sock. Das Verzeichnis gehoert dem Benutzer
+/// mysql; wer Terranova als gewoehnlicher Benutzer startet, darf dort nichts
+/// anlegen, und mariadbd bricht sofort mit Code 1 ab. Terranova selbst
+/// spricht MariaDB nur ueber TCP an - der Socket muss bloss irgendwo liegen
+/// duerfen.
+///
+/// Ein Unix-Socket-Pfad hat hoechstens 108 Bytes. Liegt das Netzwerk tief
+/// verschachtelt, weicht er ins Temp-Verzeichnis aus, je Port eindeutig.
+#[cfg(unix)]
+pub fn mariadb_socket(paths: &Paths, port: u16) -> PathBuf {
+    let p = paths.mariadb_home().join("mysqld.sock");
+    if p.as_os_str().len() < 100 {
+        p
+    } else {
+        std::env::temp_dir().join(format!("terranova-mariadb-{port}.sock"))
+    }
+}
+
 /// Der Kommandozeilenclient - fuer das Anlegen der Datenbanken und fuers
 /// Herunterfahren.
 #[cfg(windows)]
@@ -778,5 +799,32 @@ mod java_tests {
         fs::create_dir_all(&bin).unwrap();
         fs::write(bin.join(JAVA_EXE), b"").unwrap();
         assert_eq!(bundled_java(&paths), Some(bin.join(JAVA_EXE)));
+    }
+}
+
+#[cfg(all(test, unix))]
+mod unix_tests {
+    use super::*;
+
+    #[test]
+    fn socket_liegt_im_eigenen_verzeichnis() {
+        let paths = Paths::new("/home/wolf/repos/server-terranova");
+        let s = mariadb_socket(&paths, 13306);
+        assert_eq!(
+            s,
+            PathBuf::from("/home/wolf/repos/server-terranova/runtime/mariadb/mysqld.sock")
+        );
+        assert!(
+            !s.starts_with("/run"),
+            "nie das Verzeichnis des mysql-Benutzers"
+        );
+    }
+
+    #[test]
+    fn zu_langer_pfad_weicht_ins_temp_verzeichnis_aus() {
+        let deep = format!("/home/wolf/{}", "sehr-tief/".repeat(12));
+        let s = mariadb_socket(&Paths::new(&deep), 13306);
+        assert!(s.as_os_str().len() < 108, "{}", s.display());
+        assert!(s.ends_with("terranova-mariadb-13306.sock"));
     }
 }

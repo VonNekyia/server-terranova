@@ -211,12 +211,34 @@ impl Backend for Native {
             }
         };
 
+        // Das Arbeitsverzeichnis muss es geben, sonst scheitert der Start
+        // mit einem nackten "No such file or directory" - auch wenn das
+        // Programm selbst da ist. Unter Windows legt der Download von Redis
+        // runtime/redis nebenbei an; unter Linux kommt Redis aus dem Paket,
+        // und niemand legte das Verzeichnis je an.
+        std::fs::create_dir_all(&node.dir).map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!("Verzeichnis {} anlegen: {e}", node.dir.display()),
+            )
+        })?;
         cmd.current_dir(&node.dir)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         sys::hide_window(&mut cmd);
-        cmd.spawn()
+        // Ein nacktes "No such file or directory" sagt nicht, ob das Programm
+        // fehlt oder das Verzeichnis - also beides dazuschreiben.
+        cmd.spawn().map_err(|e| {
+            io::Error::new(
+                e.kind(),
+                format!(
+                    "{e} (Programm {}, Verzeichnis {})",
+                    Path::new(cmd.get_program()).display(),
+                    node.dir.display()
+                ),
+            )
+        })
     }
 
     /// Unter Unix gibt es einen echten sanften Ausweg: SIGTERM. Die JVM

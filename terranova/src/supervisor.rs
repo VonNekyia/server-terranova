@@ -748,7 +748,9 @@ impl Supervisor {
         }
 
         if let Some(n) = self.node("mariadb") {
-            self.start_node(&n)?;
+            // Der Fehler laeuft von hier bis in die Startmeldung hoch - ohne
+            // den Namen stuende dort nur, dass irgendetwas fehlte.
+            self.start_node(&n).map_err(|e| named(&n, e))?;
             let port = self.cfg.deps.mariadb.port;
             if !deps::wait_until(|| deps::mariadb_ready(port), Duration::from_secs(60)) {
                 return Err(io::Error::other("MariaDB antwortet nicht"));
@@ -758,7 +760,7 @@ impl Supervisor {
             self.log("Datenbanken bereit");
         }
         if let Some(n) = self.node("redis") {
-            self.start_node(&n)?;
+            self.start_node(&n).map_err(|e| named(&n, e))?;
             let port = self.cfg.deps.redis.port;
             if !deps::wait_until(|| deps::redis_ready(port), Duration::from_secs(30)) {
                 return Err(io::Error::other("Redis antwortet nicht"));
@@ -1032,6 +1034,11 @@ impl Supervisor {
             let _ = fs::write(self.paths.node_state(), text);
         }
     }
+}
+
+/// Stellt einem Fehler den Namen des Knotens voran.
+fn named(node: &Node, e: io::Error) -> io::Error {
+    io::Error::new(e.kind(), format!("{}: {e}", node.spec.name))
 }
 
 fn order_of(kind: NodeKind) -> u8 {

@@ -31,7 +31,7 @@ use crate::backend::{self, Backend, Native};
 use crate::config::{Config, NodeKind, NodeSpec, Runtime};
 use crate::console::{Kind, LineRing};
 use crate::paths::Paths;
-use crate::{deps, mines, rcon, secrets, sync, sys};
+use crate::{config, deps, mines, rcon, secrets, sync, sys, velocity};
 
 /// So viele Zeilen Konsole haelt jeder Knoten vor.
 const CONSOLE_LINES: usize = 2000;
@@ -616,6 +616,10 @@ impl Supervisor {
         // ueberhaupt laden koennten.
         self.start_deps()?;
 
+        // Was es an Dungeons gibt, gehoert in velocity.toml, bevor der Proxy
+        // die Datei liest.
+        self.sync_proxy_servers();
+
         // Bestuecken, dann starten. Ein laufender Server haelt seine Jars
         // offen, deshalb passiert das vorher.
         let syncer = sync::Syncer::new(&self.paths, &self.cfg)
@@ -866,6 +870,9 @@ impl Supervisor {
         let syncer = sync::Syncer::new(&self.paths, &self.cfg)
             .map_err(|e| io::Error::other(e.to_string()))?;
         syncer.sync(&node.spec, false)?;
+        // Vor dem Start: sonst stuende der Server schon bereit, waehrend der
+        // Proxy ihn noch nicht kennt.
+        self.sync_proxy_servers();
         self.start_node(&node)?;
         self.save_state();
         Ok(node)
@@ -893,6 +900,62 @@ impl Supervisor {
         }
         if let Err(e) = self.start_node(node) {
             self.log(format!("{}: Start fehlgeschlagen: {e}", node.spec.name));
+        }
+    }
+
+    /// Traegt die offenen Dungeons in velocity.toml ein und laesst den Proxy
+    /// neu laden.
+    ///
+    /// Vorher standen alle acht Plaetze fest in der Datei, ob offen oder
+    /// nicht. Jetzt steht dort, was es wirklich gibt - wer die Zahl der
+    /// Plaetze in terranova.yml aendert, muss nichts mehr nachziehen.
+    ///
+    /// Aendert sich am Inhalt nichts, wird weder geschrieben noch neu
+    /// geladen: ein Neuladen bei jedem Anlass waere ein Grund, es sein zu
+    /// lassen.
+    pub fn sync_proxy_servers(&self) {
+        let file = self
+            .paths
+            .resolve(&self.cfg.proxy.dir)
+            .join("velocity.toml");
+        let text = match fs::read_to_string(&file) {
+            Ok(t) => t,
+            Err(e) => {
+                self.log(format!("velocity.toml: {e}"));
+                return;
+            }
+        };
+        let open: Vec<(String, u16)> = mines::existing(&self.paths.servers(), self.cfg.mines.slots)
+            .into_iter()
+            .map(|slot| {
+                (
+                    mines::name(slot),
+                    self.cfg.mines.base_port + u16::from(slot),
+                )
+            })
+            .collect();
+        let Some(new) = velocity::with_mines(&text, &open) else {
+            return;
+        };
+        if let Err(e) = fs::write(&file, new) {
+            self.log(format!("velocity.toml schreiben: {e}"));
+            return;
+        }
+
+        // Der Proxy liest die Datei nur beim Start und auf Zuruf. Laeuft er
+        // nicht, genuegt die geschriebene Datei - er liest sie ohnehin gleich.
+        let Some(proxy) = self.node(config::PROXY) else {
+            return;
+        };
+        if proxy.status() != Status::Ready {
+            return;
+        }
+        match self.send_command(&proxy, "velocity reload") {
+            Ok(_) => self.log(format!(
+                "Proxy neu geladen - {} Dungeon(s) eingetragen",
+                open.len()
+            )),
+            Err(e) => self.log(format!("Proxy neu laden: {e}")),
         }
     }
 

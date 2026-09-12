@@ -70,6 +70,9 @@ fn delete(sup: &Arc<Supervisor>, name: &str) -> std::io::Result<()> {
     let grave = trash.join(format!("{name}-{}", mines::now_unix()));
     fs::rename(&dir, &grave)?;
     sup.remove_node(name);
+    // Der Platz ist weg - dann soll auch der Proxy niemanden mehr dorthin
+    // schicken.
+    sup.sync_proxy_servers();
     fs::remove_dir_all(&grave)
 }
 

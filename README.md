@@ -83,7 +83,7 @@ schmalen Start wird über Nacht also kein vollständiger.
 | `main` | 25566 | 4 GB | die gewachsene Welt: Nations, BetonQuest, Nexo, Pl3xMap, BountyfulSeas, Citizens, Proficisci |
 | `build` | 25567 | 2 GB | Bauserver, Kreativ, flache Welt |
 | `farm` | 25568 | 2 GB | Farmserver |
-| `mining-1` … `mining-8` | 25571 … | 2 GB | Dungeons, auf Zuruf geöffnet |
+| `mining-1` … `mining-8` | 25571 … | 2 GB | Dungeons, auf Zuruf geöffnet, im Proxy zur Laufzeit eingetragen |
 
 Nur der Proxy ist von außen erreichbar. Die Server binden auf `127.0.0.1` —
 wer direkt auf 25566 will, müsste schon auf der Maschine sein.
@@ -120,15 +120,20 @@ oder vom Arbeitsverzeichnis aufwärts.
 terranova mine open 3
 ```
 
-Ein Dungeon ist eine Kopie von `templates\mining` auf einem eigenen Port. Die
-acht Plätze stehen fest in `proxy\velocity.toml`; geöffnet wird nur, was
-gebraucht wird. Ein eingetragener, nicht laufender Server stört Velocity nicht —
-ein Verbindungsversuch gibt dann nur eine Fehlermeldung.
+Ein Dungeon ist eine Kopie einer Vorlage auf einem eigenen Port — welcher,
+sagt `--template`; `terranova mine templates` zeigt, was zur Wahl steht. Womit
+er angelegt wurde, merkt er sich, und dabei bleibt es auch beim Bestücken.
 
-Ein Dungeon bleibt **24 Stunden** offen und übersteht dabei auch einen
-Neustart des Netzwerks: er wird beim nächsten Start wieder hochgefahren
-(`mines.resume`). Abgeräumt wird er vom Supervisor selbst, im Takt von
-`schedule.reap_every`.
+Den Eintrag in `proxy\velocity.toml` legt Terranova selbst an und lässt den
+Proxy mit `velocity reload` nachladen — Velocity meldet Server zur Laufzeit an
+und ab. In der Datei gehört ihm nur der Block zwischen den beiden
+Markierungszeilen; alles andere darin bleibt unangetastet. Wer `mines.slots`
+ändert, muss dort also nichts nachziehen.
+
+Ein Dungeon bleibt **24 Stunden** offen. Einen Neustart des Netzwerks übersteht
+er als Verzeichnis, aber er fährt nicht von selbst wieder hoch — gestartet wird
+nur, was jemand öffnet (`mines.resume: false`). Abgeräumt wird er vom
+Supervisor selbst, im Takt von `schedule.reap_every`.
 
 Gelöscht heißt: Verzeichnis weg, das nächste `open` legt eine frische Welt an.
 Ein noch laufender Dungeon wird übersprungen, `--stop-running` beendet ihn
@@ -356,8 +361,8 @@ und danach `wsl --shutdown`. Auch das rechnet `doctor` vor.
 ## Speicher
 
 Proxy 0,5 + main 4 + build 2 + farm 2 macht 8,5 GB Grundlast. Bei 32 GB im
-Rechner bleiben etwa 20 GB für Dungeons, also rund **acht** gleichzeitig — was
-genau den acht Plätzen in `velocity.toml` entspricht.
+Rechner bleiben etwa 20 GB für Dungeons, also rund **acht** gleichzeitig — die
+Obergrenze setzt `mines.slots` in `terranova.yml`.
 
 ## Mitarbeiten
 

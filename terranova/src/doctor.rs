@@ -159,18 +159,16 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
                 ),
                 None => add(Level::Warn, "Weiterleitung", "player-info-forwarding-mode fehlt".into()),
             }
-            let mut missing = Vec::new();
-            for name in cfg.servers.keys() {
-                if !v.servers.contains(name) {
-                    missing.push(name.clone());
-                }
-            }
-            for slot in 1..=cfg.mines.slots {
-                let n = crate::mines::name(slot);
-                if !v.servers.contains(&n) {
-                    missing.push(n);
-                }
-            }
+            // Die festen Server muessen dastehen. Die Dungeons nicht: die
+            // traegt Terranova beim Oeffnen ein und laesst den Proxy neu
+            // laden - stehen sie trotzdem von Hand drin, weicht der eigene
+            // Block ihnen beim naechsten Schreiben.
+            let missing: Vec<String> = cfg
+                .servers
+                .keys()
+                .filter(|n| !v.servers.contains(n))
+                .cloned()
+                .collect();
             if missing.is_empty() {
                 add(
                     Level::Ok,
@@ -182,6 +180,28 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
                     Level::Fail,
                     "Servereintraege",
                     format!("in velocity.toml fehlen: {}", missing.join(", ")),
+                );
+            }
+
+            let offen = crate::mines::existing(&paths.servers(), cfg.mines.slots).len();
+            let eingetragen = v
+                .servers
+                .iter()
+                .filter(|n| crate::mines::parse_name(n).is_some())
+                .count();
+            if eingetragen == offen {
+                add(
+                    Level::Ok,
+                    "Dungeon-Eintraege",
+                    format!("{offen} offen, {eingetragen} in velocity.toml"),
+                );
+            } else {
+                add(
+                    Level::Warn,
+                    "Dungeon-Eintraege",
+                    format!(
+                        "{offen} offen, aber {eingetragen} in velocity.toml - der naechste Start oder das naechste Oeffnen zieht das nach"
+                    ),
                 );
             }
         }
@@ -572,9 +592,14 @@ forwarding-secret-file = "forwarding.secret"
         for name in cfg.servers.keys() {
             assert!(v.servers.contains(name), "{name} fehlt in velocity.toml");
         }
-        for slot in 1..=cfg.mines.slots {
-            let n = crate::mines::name(slot);
-            assert!(v.servers.contains(&n), "{n} fehlt in velocity.toml");
-        }
+        // Dungeons gehoeren nicht mehr von Hand hinein - die traegt
+        // Terranova beim Oeffnen ein.
+        assert!(
+            !v.servers
+                .iter()
+                .any(|n| crate::mines::parse_name(n).is_some()),
+            "Dungeon-Eintraege von Hand in velocity.toml: {:?}",
+            v.servers
+        );
     }
 }

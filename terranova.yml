@@ -77,7 +77,8 @@ rcon_offset: 100
 
 mines:
   template: mining
-  # muss zu mining-1 .. mining-8 in proxy/velocity.toml passen
+  # Wie viele Dungeons gleichzeitig offen sein duerfen. Die Eintraege in
+  # proxy/velocity.toml zieht Terranova selbst nach - hier genuegt die Zahl.
   slots: 8
   # mining-N laeuft auf 25570 + N
   base_port: 25570

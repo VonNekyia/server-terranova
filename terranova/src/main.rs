@@ -25,6 +25,7 @@ mod sched;
 mod secrets;
 mod supervisor;
 mod sync;
+mod velocity;
 mod web;
 
 // Alles Plattformeigene liegt hinter einer Fassade: Prozesse, Ports, Zeit,

@@ -35,18 +35,14 @@ forced-hosts = {}
 	main = "127.0.0.1:25566"
 	build = "127.0.0.1:25567"
 	farm = "127.0.0.1:25568"
-	# Dungeon-Plaetze. Sie stehen hier fest drin, obwohl meist keiner laeuft -
-	# Velocity stoert das nicht, ein nicht erreichbarer Server gibt beim Verbinden
-	# nur eine Fehlermeldung. Das erspart uns, Server zur Laufzeit anzumelden.
-	# Geoeffnet werden sie mit  scripts\dungeon.ps1 open <anzahl>
-	mining-1 = "127.0.0.1:25571"
-	mining-2 = "127.0.0.1:25572"
-	mining-3 = "127.0.0.1:25573"
-	mining-4 = "127.0.0.1:25574"
-	mining-5 = "127.0.0.1:25575"
-	mining-6 = "127.0.0.1:25576"
-	mining-7 = "127.0.0.1:25577"
-	mining-8 = "127.0.0.1:25578"
+	# Die Dungeons stehen hier nicht mehr fest drin. Terranova traegt beim
+	# Oeffnen ein, was es wirklich gibt, und laesst den Proxy mit
+	# "velocity reload" nachladen. Der Block unten gehoert ihm - was
+	# ausserhalb steht, bleibt unangetastet.
+	# Geoeffnet wird mit  terranova mine open
+	# von terranova verwaltet - offene Dungeons, nicht von Hand aendern
+	# gerade keiner offen
+	# Ende der Dungeons
 	# Wer sich verbindet, landet auf main.
 	try = ["main"]
 

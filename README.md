@@ -269,7 +269,7 @@ Zuordnung steht als Kommentar direkt darüber. Beim nächsten Start wird sie
 angelegt.
 
 Zugangsdaten für lokale Entwicklung: `minecraft` / `minecraft` auf
-`127.0.0.1:13306`. Redis läuft ohne Passwort auf `127.0.0.1:6379`. Beide binden
+`127.0.0.1:13306`. Redis läuft ohne Passwort auf `127.0.0.1:16379` — bewusst nicht auf 6379, wo unter Linux oft schon der Systemdienst sitzt. Beide binden
 nur auf `127.0.0.1`, und der Benutzer hat Rechte je Datenbank statt auf alles.
 
 ## Weiterleitung

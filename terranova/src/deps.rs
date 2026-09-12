@@ -543,6 +543,16 @@ fn local(port: u16) -> SocketAddr {
     SocketAddr::from(([127, 0, 0, 1], port))
 }
 
+/// Ob auf diesem Port schon jemand Verbindungen annimmt.
+///
+/// Ergaenzt sys::port_owner, statt es zu ersetzen: unter Linux liest sich
+/// der Besitzer eines Ports aus /proc nur fuer eigene Prozesse. Ein
+/// Systemdienst, der als anderer Benutzer laeuft, bleibt dort unsichtbar -
+/// auf eine Verbindung antwortet er trotzdem.
+pub fn port_answers(port: u16) -> bool {
+    TcpStream::connect_timeout(&local(port), Duration::from_millis(300)).is_ok()
+}
+
 /// MariaDB begruesst jede Verbindung mit einem Handshake-Paket; im fuenften
 /// Byte steht die Protokollfassung 10. Das ist billiger, als in einer
 /// Schleife mysql.exe zu starten.
@@ -826,5 +836,20 @@ mod unix_tests {
         let s = mariadb_socket(&Paths::new(&deep), 13306);
         assert!(s.as_os_str().len() < 108, "{}", s.display());
         assert!(s.ends_with("terranova-mariadb-13306.sock"));
+    }
+}
+
+#[cfg(test)]
+mod port_tests {
+    use super::*;
+    use std::net::TcpListener;
+
+    #[test]
+    fn belegter_port_antwortet_freier_nicht() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        assert!(port_answers(port), "wer lauscht, muss antworten");
+        drop(listener);
+        assert!(!port_answers(port), "nach dem Schliessen ist der Port frei");
     }
 }

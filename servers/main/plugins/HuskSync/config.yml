@@ -61,7 +61,7 @@ redis:
   # Set "password" to '' if you don't have one.
   credentials:
     host: 127.0.0.1
-    port: 6379
+    port: 16379
     # Only change the database if you know what you are doing. The default is 0.
     database: 0
     user: ''

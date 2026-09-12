@@ -404,6 +404,13 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
         if let Some(pid) = sys::port_owner(port) {
             let who = sys::image_name(pid).unwrap_or_else(|| format!("PID {pid}"));
             busy.push(format!("{port} ({what}) belegt von {who}"));
+        } else if crate::deps::port_answers(port) {
+            // Unter Linux bleibt der Besitzer unsichtbar, wenn er als anderer
+            // Benutzer laeuft - etwa ein Systemdienst. Belegt ist der Port
+            // trotzdem.
+            busy.push(format!(
+                "{port} ({what}) belegt von einem Programm eines anderen Benutzers"
+            ));
         }
     }
     if busy.is_empty() {

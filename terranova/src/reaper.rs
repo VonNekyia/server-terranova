@@ -67,6 +67,33 @@ pub fn reap(sup: &Arc<Supervisor>, dry_run: bool, stop_running: bool) -> Vec<Str
     done
 }
 
+/// Raeumt einen Dungeon sofort ab, ohne auf seine Zeit zu warten.
+///
+/// Stoppen, verschieben, loeschen - dieselbe Reihenfolge wie beim Ablauf, nur
+/// ohne die Frage nach dem Alter. Wer ihn wegwirft, hat sich das ueberlegt;
+/// die Welt ist danach weg und der Platz frei.
+pub fn reap_one(sup: &Arc<Supervisor>, slot: u8) -> Result<(), String> {
+    let name = mines::name(slot);
+    if !sup.paths.mine(&name).is_dir() {
+        return Err(format!("{name} gibt es nicht"));
+    }
+    if let Some(n) = sup.node(&name) {
+        if n.status() != Status::Stopped {
+            sup.stop_node(&n);
+        }
+    }
+    match delete(sup, &name) {
+        Ok(()) => {
+            sup.log(format!("{name}: abgeraeumt"));
+            Ok(())
+        }
+        Err(e) => {
+            sup.log(format!("{name}: abraeumen fehlgeschlagen: {e}"));
+            Err(e.to_string())
+        }
+    }
+}
+
 fn delete(sup: &Arc<Supervisor>, name: &str) -> std::io::Result<()> {
     let dir = sup.paths.mine(name);
     let trash = sup.paths.trash();

@@ -14,7 +14,7 @@ use crate::config::{Config, NodeKind, NodeSpec};
 use crate::paths::Paths;
 use crate::sys;
 
-/// Die Flags aus network.ps1, unveraendert uebernommen.
+/// Die Aikar-Flags, unveraendert aus dem alten Startskript uebernommen.
 pub const AIKAR: &[&str] = &[
     "-XX:+AlwaysPreTouch",
     "-XX:+DisableExplicitGC",

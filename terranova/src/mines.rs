@@ -150,7 +150,7 @@ pub fn templates(templates_dir: &Path, static_names: &[String]) -> Vec<String> {
 /// Wann wurde der Dungeon geoeffnet?
 ///
 /// Aus der Markierungsdatei. Fehlt sie - ein Dungeon noch aus der Zeit von
-/// dungeon.ps1 -, aus dem Anlegedatum des Verzeichnisses. Das allein waere
+/// den alten Skripten -, aus dem Anlegedatum des Verzeichnisses. Das waere
 /// unzuverlaessig: NTFS gibt einem Verzeichnis, das binnen 15 Sekunden unter
 /// gleichem Namen neu entsteht, das alte Anlegedatum zurueck ("tunneling").
 /// Ein gerade abgeraeumter und sofort neu geoeffneter Dungeon waere sonst
@@ -211,7 +211,7 @@ pub fn existing(servers_dir: &Path, slots: u8) -> Vec<u8> {
     v
 }
 
-/// Welche Plaetze `mine open` benutzt - dieselbe Regel wie in dungeon.ps1:
+/// Welche Plaetze `mine open` benutzt:
 /// ab `slot` (sonst 1) aufwaerts, laufende werden uebersprungen. Ist ein
 /// Platz ausdruecklich angegeben und laeuft er schon, ist dort Schluss.
 ///

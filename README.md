@@ -138,7 +138,28 @@ herunter, auch wenn gerade jemand darin steht. Wer drin ist, landet auf `main`.
 
 `Schließen` beendet ihn vorzeitig: er bleibt unten, der Proxy meldet ihn ab,
 und die Uhr fängt von vorn an — nach weiteren 24 Stunden ist er weg. Bis dahin
-holt `mine open --slot N` ihn samt seiner Welt zurück.
+holt `mine open --slot N` ihn samt seiner Welt zurück; im Dashboard heißt der
+Knopf `Reopen`. Wer ihn sofort loswerden will, nimmt `Reaper` beziehungsweise
+`mine reap --slot N` — danach ist die Welt weg und der Platz frei.
+
+### Eine Welt in der Vorlage
+
+Was in `templates/<name>/` liegt, wird beim **Anlegen** eines Dungeons einmal
+kopiert — ein `world/` darin also auch. Kopiert wird aber nur, wenn das
+Verzeichnis noch nicht existiert: ein Dungeon behält seine Welt, sonst wäre ein
+Neustart des Netzwerks eine Landkarte weiter.
+
+Wer die Vorlagenwelt ändert, sieht davon in einem **bestehenden** Dungeon
+deshalb nichts. Erst räumen, dann öffnen:
+
+```
+terranova mine reap --slot 1
+terranova mine open --slot 1
+```
+
+Worlds unter `templates/` sind nicht versioniert (`templates/*/world/` steht in
+`.gitignore`). Auf einem anderen Klon fehlt eine Vorlagenwelt also — wer sie
+teilen will, muss die Regel dort streichen.
 
 Gelöscht heißt: Verzeichnis weg, das nächste `open` legt eine frische Welt an.
 `terranova mine reap` von Hand überspringt einen laufenden Dungeon —

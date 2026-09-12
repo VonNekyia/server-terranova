@@ -36,7 +36,8 @@ Dungeons
   mine templates        welche Vorlagen es gibt
   mine close <n>        schliessen
   mine list             was offen ist
-  mine reap             abgelaufene abraeumen (--dry-run zeigt nur)
+  mine reap             abgelaufene abraeumen (--dry-run zeigt nur,
+                        --slot N raeumt genau den sofort ab)
 
 Oberflaeche
   dashboard             im Browser oeffnen
@@ -766,6 +767,14 @@ fn mine(paths: &Paths, cfg: &Config, args: &Args) -> ExitCode {
             }
             other => report(other, ""),
         },
+        // Mit --slot: genau den, sofort, ohne Ruecksicht auf sein Alter.
+        "reap" if args.slot.is_some() => {
+            let slot = args.slot.unwrap();
+            report(
+                c.post(&format!("/api/mines/{slot}/reap"), json!({})),
+                &format!("[terranova] mining-{slot} abgeraeumt - die Welt ist weg"),
+            )
+        }
         "reap" => match c.post(
             "/api/mines/reap",
             json!({ "dry_run": args.dry_run, "stop_running": args.stop_running }),
@@ -780,7 +789,7 @@ fn mine(paths: &Paths, cfg: &Config, args: &Args) -> ExitCode {
             other => report(other, ""),
         },
         other => {
-            eprintln!("terranova: mine {other}? Es gibt open, close, list, reap.");
+            eprintln!("terranova: mine {other}? Es gibt open, close, list, reap, templates.");
             ExitCode::from(2)
         }
     }

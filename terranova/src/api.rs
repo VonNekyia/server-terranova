@@ -66,8 +66,10 @@ fn kind_str(k: NodeKind) -> &'static str {
 /// beides: ein Paper-Server, und zwar ein dynamischer.
 fn tags(k: NodeKind) -> &'static [&'static str] {
     match k {
-        NodeKind::MariaDb => &["database", "static"],
-        NodeKind::Redis => &["valuedb", "static"],
+        // Zwei Schlagworte: was es ist, und welcher Art. So steht bei beiden
+        // Datenbanken db, und daneben, worin sie sich unterscheiden.
+        NodeKind::MariaDb => &["db", "sql", "static"],
+        NodeKind::Redis => &["db", "value", "static"],
         NodeKind::Proxy => &["proxy", "static"],
         NodeKind::Server => &["paper", "static"],
         NodeKind::Mine(_) => &["paper", "dungeon", "dynamic"],
@@ -215,6 +217,15 @@ impl Api {
             (false, ["api", "mines"]) => self.mines(),
             (true, ["api", "mines", "open"]) => self.open_mines(&req),
             (true, ["api", "mines", "reap"]) => self.reap(&req),
+            // Frueher weg als nach seiner Zeit - die Welt ist danach fort.
+            (true, ["api", "mines", slot, "reap"]) => match slot.parse::<u8>().ok() {
+                Some(s) => match crate::reaper::reap_one(&self.sup, s) {
+                    Ok(()) => ok_json(json!({ "reaped": mines::name(s) })),
+                    Err(e) => bad(409, &e),
+                },
+                None => bad(404, "kein solcher Dungeon"),
+            },
+
             (true, ["api", "mines", slot, "close"]) => match slot.parse::<u8>().ok() {
                 Some(s) if self.sup.node(&mines::name(s)).is_some() => {
                     ok_json(json!({ "stopped": self.sup.close_mine(s) }))

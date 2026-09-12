@@ -4,7 +4,7 @@
 //! Jedes Jar liegt genau einmal im Repository, naemlich unter templates/.
 //! Ein Plugin-Update ist damit eine Datei und kein viermaliges Kopieren.
 //!
-//! Neu gegenueber sync-servers.ps1: was einmal hierher kopiert wurde, steht
+//! Was einmal hierher kopiert wurde, steht
 //! in einer Liste (.terranova-sync.json). Verschwindet ein Jar aus der
 //! Vorlage, wird die Kopie geloescht. Das alte Copy-Item hat nie etwas
 //! entfernt - nach einem Plugin-Update lagen HuskSync-4.0.0.jar und
@@ -190,8 +190,13 @@ impl<'a> Syncer<'a> {
         // --- Aufraeumen: was frueher von hier kam und jetzt nicht mehr ---------
         // Nur fuer Bestuecktes: ohne Vorlage gibt es keine Kopien, die
         // veralten koennten - und ein leeres Verzeichnis wuerde sonst das
-        // ganze Serververzeichnis leerraeumen.
+        // ganze Serververzeichnis leerraeumen. Ein Manifest aus der Zeit, als
+        // auch feste Server bestueckt wurden, kann dann weg.
         if node.template.is_none() {
+            let alt = dir.join(MANIFEST);
+            if alt.is_file() && !dry_run {
+                let _ = fs::remove_file(&alt);
+            }
             return Ok(r);
         }
         let manifest_path = dir.join(MANIFEST);

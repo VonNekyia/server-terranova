@@ -113,7 +113,7 @@
   .crashloop, .conflict, .down { color: var(--bad); }
   .waiting { color: var(--dim); }
 
-  /* Was ein Knoten ist: paper, proxy, database, valuedb, dungeon. Ob er
+  /* Was ein Knoten ist: paper, proxy, db+sql, db+value, dungeon. Ob er
      statisch oder dynamisch ist, sagt schon der Abschnitt, in dem er steht -
      das steht deshalb nicht noch einmal als Schlagwort daneben. */
   .tag {
@@ -124,8 +124,9 @@
   .tag + .tag { margin-left: 4px; }
   .tag.dungeon { color: #8fd6ff; border-color: rgba(86, 200, 255, .35); background: rgba(86, 200, 255, .08); }
   .tag.proxy { color: #c3a6ff; border-color: rgba(163, 130, 255, .3); background: rgba(163, 130, 255, .08); }
-  .tag.database { color: #ffc98a; border-color: rgba(226, 168, 68, .3); background: rgba(226, 168, 68, .08); }
-  .tag.valuedb { color: #ff9f9c; border-color: rgba(232, 99, 95, .28); background: rgba(232, 99, 95, .07); }
+  .tag.db { color: #cbd3e0; border-color: rgba(203, 211, 224, .25); background: rgba(203, 211, 224, .06); }
+  .tag.sql { color: #ffc98a; border-color: rgba(226, 168, 68, .3); background: rgba(226, 168, 68, .08); }
+  .tag.value { color: #ff9f9c; border-color: rgba(232, 99, 95, .28); background: rgba(232, 99, 95, .07); }
   .tag.paper { color: #9fe3b6; border-color: rgba(94, 203, 132, .28); background: rgba(94, 203, 132, .07); }
 
   a { color: var(--accent); text-decoration: none; }
@@ -526,7 +527,7 @@ async function refresh() {
         const td = document.createElement("td");
         td.className = "actions";
         if (mine.closed) {
-          td.append(button("Wieder öffnen",
+          td.append(button("Reopen",
             () => api("/api/mines/open", "POST", { count: 1, slot: +slot })));
         } else {
           if (mine.status !== "stopped") {
@@ -537,6 +538,12 @@ async function refresh() {
             await api(`/api/mines/${slot}/close`, "POST");
           }, true));
         }
+        // Vorzeitig weg: nicht nur unten, sondern fort. Das trifft die Welt,
+        // also fragt es nach - und steht bei jedem, offen wie geschlossen.
+        td.append(button("Reaper", async () => {
+          if (!confirm(`${mine.name} jetzt abräumen? Die Welt ist danach weg und der Platz frei.`)) return;
+          await api(`/api/mines/${slot}/reap`, "POST");
+        }, true));
         tr.append(td); mb.append(tr);
       }
     }

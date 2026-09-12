@@ -1,7 +1,7 @@
 //! Das Velocity-Forwarding in config/paper-global.yml eintragen.
 //!
 //! Zeilenweise und nicht ueber einen YAML-Parser, genau wie bisher in
-//! sync-servers.ps1: die Datei gehoert Paper, hat Kommentare und eine
+//! den alten Skripten: die Datei gehoert Paper, hat Kommentare und eine
 //! gewachsene Reihenfolge. Ein Parser wuerde sie beim Schreiben neu
 //! formatieren und jedes Paper-Update mit einem unlesbaren Diff quittieren.
 //!

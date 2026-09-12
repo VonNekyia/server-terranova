@@ -294,10 +294,10 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
 
         // Und ob der oeffentliche Name ueberhaupt existiert.
         //
-        // Genau daran hing es einmal: lokal antwortete Pl3xMap munter mit 200,
-        // doctor meldete lauter Haken - und map.mcterranova.de hatte schlicht
-        // keinen DNS-Eintrag. Wer die Karte im Browser aufruft, sieht davon
-        // nur eine leere Seite.
+        // Genau daran hing es einmal: lokal antwortete Pl3xMap munter mit 200
+        // und doctor meldete lauter Haken, waehrend der Name aus web.map.url
+        // gar nicht im DNS stand. Wer die Karte im Browser aufrief, sah nur
+        // eine leere Seite.
         //
         // Geprueft wird bewusst nur der Name, nicht die Seite selbst: fuer
         // HTTPS braeuchte es TLS und damit eine Abhaengigkeit, die sich fuer
@@ -430,7 +430,7 @@ fn ports_of(cfg: &Config) -> Vec<(u16, String)> {
     v
 }
 
-/// Der Rechnername aus einer Adresse wie `https://map.mcterranova.de/karte`.
+/// Der Rechnername aus einer Adresse wie `https://karte.example.org/karte`.
 ///
 /// Kein URL-Parser dafuer: gebraucht wird genau dieser eine Teil, und die
 /// Adresse steht in der eigenen Konfiguration - sie kommt nicht von aussen.
@@ -523,14 +523,14 @@ mod tests {
     #[test]
     fn rechnername_aus_der_adresse() {
         let h = |s| host_of(s).unwrap_or_default();
-        assert_eq!(h("https://map.mcterranova.de"), "map.mcterranova.de");
+        assert_eq!(h("https://karte.example.org"), "karte.example.org");
         assert_eq!(
-            h("https://map.mcterranova.de/karte?z=3#hier"),
-            "map.mcterranova.de"
+            h("https://karte.example.org/karte?z=3#hier"),
+            "karte.example.org"
         );
         assert_eq!(h("http://localhost:8080"), "localhost");
         // ohne Schema
-        assert_eq!(h("map.mcterranova.de"), "map.mcterranova.de");
+        assert_eq!(h("karte.example.org"), "karte.example.org");
         // IPv6 steht in Klammern, der Doppelpunkt darin ist kein Port
         assert_eq!(h("http://[::1]:8080/"), "::1");
         // Leer heisst: keine oeffentliche Adresse eingetragen, nichts zu pruefen

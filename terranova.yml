@@ -123,5 +123,11 @@ web:
     # servers/main/plugins/Pl3xMap/config.yml passen
     port: 8080
     server: main
-    # nur zum Anzeigen
-    url: "https://map.mcterranova.de"
+    # Nur zum Anzeigen: worauf der Verweis im Dashboard zeigt. Leer heisst
+    # http://127.0.0.1:<port>, also die Karte auf diesem Rechner.
+    #
+    # Eine oeffentliche Adresse gehoert nur dann hierher, wenn es sie
+    # wirklich gibt und sie auf diesen Port zeigt. Stand hier einmal eine
+    # fremde Domain, fuehrte der Verweis ins Leere - die Karte lief die
+    # ganze Zeit, nur kam niemand hin.
+    url: ""

@@ -107,6 +107,8 @@ pub struct Native {
     java: crate::config::Java,
     mariadb_server: PathBuf,
     mariadb_data: PathBuf,
+    #[cfg(unix)]
+    mariadb_socket: PathBuf,
     redis_server: PathBuf,
     mariadb_port: u16,
     redis_port: u16,
@@ -121,6 +123,8 @@ impl Native {
             java: cfg.java.clone(),
             mariadb_server: crate::deps::mariadb_server(paths, &cfg.deps.mariadb.version),
             mariadb_data: paths.mariadb_home().join("data"),
+            #[cfg(unix)]
+            mariadb_socket: crate::deps::mariadb_socket(paths, cfg.deps.mariadb.port),
             redis_server: crate::deps::redis_server(paths),
             mariadb_port: cfg.deps.mariadb.port,
             redis_port: cfg.deps.redis.port,
@@ -165,6 +169,15 @@ impl Backend for Native {
                     .arg("--bind-address=127.0.0.1")
                     .arg(format!("--datadir={}", self.mariadb_data.display()))
                     .arg("--max_allowed_packet=64M");
+                // Sonst will mariadbd nach /run/mysqld schreiben und bricht als
+                // gewoehnlicher Benutzer sofort ab - siehe deps::mariadb_socket.
+                // Unter Windows gibt es keinen Unix-Socket.
+                #[cfg(unix)]
+                c.arg(format!("--socket={}", self.mariadb_socket.display()))
+                    .arg(format!(
+                        "--pid-file={}",
+                        self.mariadb_data.with_file_name("mysqld.pid").display()
+                    ));
                 c
             }
             NodeKind::Redis => {

@@ -64,7 +64,11 @@ deps:
     databases: [nations, betonquest, chatcontrol, interactivechat, luckperms, proficisci, bountyfulseas, husksync]
 
   redis:
-    port: 6379
+    # Nicht 6379: dort sitzt unter Linux oft der Redis-Systemdienst aus
+    # apt install redis-server, und der gehoert nicht Terranova - genau wie
+    # MariaDB auf 13306 statt 3306. Muss zu redis.credentials.port in den
+    # HuskSync-Configs passen.
+    port: 16379
     # HuskSync braucht Redis. Offiziell gibt es Redis fuer Windows nicht;
     # verwendet wird der native Port von zkteco-home, festgenagelt auf den
     # Commit von 8.10.1 - lose Dateien am Zweigende sind kein stabiles Artefakt.

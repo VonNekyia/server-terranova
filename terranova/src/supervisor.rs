@@ -377,6 +377,23 @@ impl Supervisor {
         if self.adopt(node) {
             return Ok(());
         }
+        // Belegt, aber nicht von uns: nicht starten. Sonst scheitert der
+        // Start am Port, der Waechter versucht es alle paar Sekunden neu -
+        // und die Bereitschaftspruefung haelt das fremde Programm auf dem
+        // Port womoeglich fuer das eigene. So geschehen mit dem
+        // Redis-Systemdienst unter Linux, den Terranova nicht einmal sehen
+        // konnte, weil er als anderer Benutzer laeuft.
+        if node.status() == Status::Conflict || deps::port_answers(node.spec.port) {
+            node.set_status(Status::Conflict);
+            return Err(io::Error::new(
+                io::ErrorKind::AddrInUse,
+                format!(
+                    "Port {} ist schon belegt, und nicht von Terranova - \
+                     das Programm dort beenden oder den Port in terranova.yml aendern",
+                    node.spec.port
+                ),
+            ));
+        }
 
         let mut child = match self.backend.spawn(&node.spec) {
             Ok(c) => c,

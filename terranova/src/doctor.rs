@@ -222,7 +222,12 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
                 );
             }
 
-            let offen = crate::mines::existing(&paths.dynamic(), cfg.mines.slots).len();
+            // Geschlossene zaehlen nicht mit: sie stehen absichtlich nicht
+            // im Proxy, weil sie nicht wieder hochfahren.
+            let offen = crate::mines::existing(&paths.dynamic(), cfg.mines.slots)
+                .into_iter()
+                .filter(|s| crate::mines::closed_at(&paths.mine(&crate::mines::name(*s))).is_none())
+                .count();
             let eingetragen = v
                 .servers
                 .iter()

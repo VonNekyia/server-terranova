@@ -2,6 +2,7 @@
 
 use std::fmt::Write as _;
 use std::fs;
+use std::net::ToSocketAddrs as _;
 use std::process::{Command, Stdio};
 
 use crate::config::{Config, Runtime};
@@ -290,6 +291,34 @@ pub fn run(paths: &Paths, cfg: &Config) -> Vec<Check> {
                 format!("Pl3xMap in {} auf Port {p}", map.server),
             ),
         }
+
+        // Und ob der oeffentliche Name ueberhaupt existiert.
+        //
+        // Genau daran hing es einmal: lokal antwortete Pl3xMap munter mit 200,
+        // doctor meldete lauter Haken - und map.mcterranova.de hatte schlicht
+        // keinen DNS-Eintrag. Wer die Karte im Browser aufruft, sieht davon
+        // nur eine leere Seite.
+        //
+        // Geprueft wird bewusst nur der Name, nicht die Seite selbst: fuer
+        // HTTPS braeuchte es TLS und damit eine Abhaengigkeit, die sich fuer
+        // diese eine Pruefung nicht lohnt.
+        if let Some(host) = host_of(&map.url) {
+            let loest_auf = (host.as_str(), 443u16)
+                .to_socket_addrs()
+                .is_ok_and(|mut a| a.next().is_some());
+            if loest_auf {
+                add(Level::Ok, "Karte", format!("{host} loest auf"));
+            } else {
+                add(
+                    Level::Warn,
+                    "Karte",
+                    format!(
+                        "{host} loest nicht auf - web.map.url zeigt ins Leere. \
+                         Fehlt der DNS-Eintrag fuer die Unterdomain?"
+                    ),
+                );
+            }
+        }
     }
 
     // --- Ports -----------------------------------------------------------------
@@ -401,6 +430,23 @@ fn ports_of(cfg: &Config) -> Vec<(u16, String)> {
     v
 }
 
+/// Der Rechnername aus einer Adresse wie `https://map.mcterranova.de/karte`.
+///
+/// Kein URL-Parser dafuer: gebraucht wird genau dieser eine Teil, und die
+/// Adresse steht in der eigenen Konfiguration - sie kommt nicht von aussen.
+fn host_of(url: &str) -> Option<String> {
+    let rest = url.split_once("://").map_or(url, |(_, r)| r);
+    // Pfad, Abfrage und Anker abschneiden, etwaige Anmeldedaten davor weg
+    let host = rest.split(['/', '?', '#']).next()?.rsplit('@').next()?;
+    // Port abtrennen - eine IPv6-Adresse steht dabei in Klammern
+    let host = if let Some(v6) = host.strip_prefix('[') {
+        v6.split(']').next()?
+    } else {
+        host.split(':').next()?
+    };
+    (!host.is_empty()).then(|| host.to_string())
+}
+
 fn java_version(java: &str) -> Option<String> {
     let mut cmd = Command::new(java);
     cmd.arg("-version").stdin(Stdio::null());
@@ -473,6 +519,24 @@ pub fn parse_velocity(text: &str) -> Velocity {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rechnername_aus_der_adresse() {
+        let h = |s| host_of(s).unwrap_or_default();
+        assert_eq!(h("https://map.mcterranova.de"), "map.mcterranova.de");
+        assert_eq!(
+            h("https://map.mcterranova.de/karte?z=3#hier"),
+            "map.mcterranova.de"
+        );
+        assert_eq!(h("http://localhost:8080"), "localhost");
+        // ohne Schema
+        assert_eq!(h("map.mcterranova.de"), "map.mcterranova.de");
+        // IPv6 steht in Klammern, der Doppelpunkt darin ist kein Port
+        assert_eq!(h("http://[::1]:8080/"), "::1");
+        // Leer heisst: keine oeffentliche Adresse eingetragen, nichts zu pruefen
+        assert_eq!(host_of(""), None);
+        assert_eq!(host_of("https://"), None);
+    }
 
     const TOML: &str = r#"
 config-version = "2.9"

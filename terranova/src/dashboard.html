@@ -324,7 +324,13 @@ function nodeRow(n) {
   const konsole = button("Konsole", async () => watch(n.name));
   const toggle = button("Stopp", () => api(`/api/nodes/${n.name}/${toggle._stop ? "stop" : "start"}`, "POST"), true);
   const neu = button("Neustart", () => api(`/api/nodes/${n.name}/restart`, "POST"));
-  td.append(konsole, toggle, neu);
+  // Der Notausgang: Stopp versucht es erst sauber und wartet dafuer Minuten.
+  // Haengt ein Server schon im Start, fuehrt das zu nichts.
+  const kill = button("Kill", async () => {
+    if (!confirm(`${n.name} sofort hart beenden? Ungespeicherte Chunks gehen verloren.`)) return;
+    await api(`/api/nodes/${n.name}/kill`, "POST");
+  }, true);
+  td.append(konsole, toggle, neu, kill);
   tr.append(td);
   const cells = tr.querySelectorAll("td");
   return {

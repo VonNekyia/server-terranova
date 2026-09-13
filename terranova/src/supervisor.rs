@@ -633,6 +633,31 @@ impl Supervisor {
         false
     }
 
+    /// Beendet einen Knoten sofort und hart - der Notausgang, wenn er haengt.
+    ///
+    /// stop_node versucht es erst sauber und wartet dafuer Minuten. Haengt ein
+    /// Server aber schon im Start, bedient er weder die Konsole noch RCON,
+    /// und das Warten fuehrt zu nichts. Ungespeicherte Chunks gehen dabei
+    /// verloren - das Dashboard fragt deshalb vorher.
+    pub fn kill_node(self: &Arc<Self>, node: &Arc<Node>) -> bool {
+        let pid = {
+            let mut g = node.lock();
+            g.desired = false;
+            g.next_try = None;
+            g.pid
+        };
+        let Some(pid) = pid else {
+            node.set_status(Status::Stopped);
+            return true;
+        };
+        self.log(format!(
+            "FEHLER {}: auf Anweisung hart beendet (PID {pid})",
+            node.spec.name
+        ));
+        self.backend.kill(&node.spec, pid);
+        node.wait_stopped(Duration::from_secs(15))
+    }
+
     fn rcon(&self, node: &Arc<Node>, command: &str) -> Option<String> {
         let port = node.spec.rcon_port?;
         match rcon::command(port, &self.rcon_password, command, Duration::from_secs(10)) {

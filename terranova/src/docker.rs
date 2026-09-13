@@ -209,6 +209,7 @@ impl Docker {
                     a.extend(AIKAR.iter().map(|s| s.to_string()));
                 }
                 a.extend(CONSOLE_FLAGS.iter().map(|s| s.to_string()));
+                a.extend(crate::backend::NETWORK_FLAGS.iter().map(|s| s.to_string()));
                 a.extend(self.cfg.java.extra.clone());
                 a.extend(["-jar".into(), jar]);
                 if !node.is_proxy() {

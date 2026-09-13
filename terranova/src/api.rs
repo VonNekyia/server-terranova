@@ -296,6 +296,12 @@ impl Api {
                 let ok = sup.stop_node(&node);
                 ok_json(json!({ "stopped": ok }))
             }
+            // Der Notausgang, wenn Stopp nicht durchkommt. Synchron wie stop -
+            // ein harter Kill ist nach hoechstens fuenfzehn Sekunden durch.
+            "kill" => {
+                let ok = sup.kill_node(&node);
+                ok_json(json!({ "killed": ok }))
+            }
             "restart" => {
                 let node2 = node.clone();
                 thread::spawn(move || sup.restart_node(&node2));

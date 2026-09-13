@@ -54,6 +54,23 @@ pub const CONSOLE_FLAGS: &[&str] = &[
     "-Dstderr.encoding=UTF-8",
 ];
 
+/// Zeitgrenzen fuer Netzverbindungen, die selbst keine setzen.
+///
+/// PlaceholderAPI prueft beim Laden seine Erweiterungen gegen eine Liste im
+/// Netz - ueber eine HttpsURLConnection ohne Zeitgrenze. Nahm die Gegenstelle
+/// die Verbindung an und antwortete dann nicht mehr, hing der Server-Thread
+/// von main ueber zwanzig Minuten im TLS-Handshake: kein Start, keine
+/// Konsole, kein RCON. Diese beiden Eigenschaften gelten fuer jede solche
+/// Verbindung ohne eigene Grenze. Aus einem Plugin, das ewig wartet, wird
+/// eines, das nach einer Minute Stille mit einem Fehler weitermacht.
+///
+/// Die Lesegrenze zaehlt Stille, nicht Dauer: ein Download, bei dem Daten
+/// fliessen, darf so lange laufen, wie er braucht.
+pub const NETWORK_FLAGS: &[&str] = &[
+    "-Dsun.net.client.defaultConnectTimeout=15000",
+    "-Dsun.net.client.defaultReadTimeout=60000",
+];
+
 /// Ein bereits laufender Prozess, den wir nicht selbst gestartet haben.
 #[derive(Debug, Clone)]
 pub struct Discovered {
@@ -144,6 +161,7 @@ impl Native {
             c.args(AIKAR);
         }
         c.args(CONSOLE_FLAGS);
+        c.args(NETWORK_FLAGS);
         c.args(&self.extra);
         c.arg("-jar");
         // Nur der Dateiname: das Arbeitsverzeichnis ist ohnehin das des
